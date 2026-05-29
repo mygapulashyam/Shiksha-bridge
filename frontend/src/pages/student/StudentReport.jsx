@@ -71,7 +71,7 @@ export default function StudentReport() {
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800 }}>{user?.name}</div>
             <div style={{ opacity: 0.8, fontSize: '0.9rem', marginTop: 4 }}>
-              {user?.class ? `Grade ${user.class.grade} – ${user.class.section}` : ''} · {user?.school?.name}
+              {user?.class ? (user.class.section ? `Grade ${user.class.grade} – ${user.class.section}` : user.class.name) : ''} · {user?.school?.name}
             </div>
           </div>
           <div className="flex gap-5">

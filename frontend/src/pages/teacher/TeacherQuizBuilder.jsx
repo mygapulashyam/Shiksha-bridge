@@ -227,7 +227,7 @@ export default function TeacherQuizBuilder() {
               <label className="form-label">Assign to Class</label>
               <select className="form-input form-select" value={quiz.assignedClass} onChange={ZF('assignedClass')}>
                 <option value="">Select Class (optional)</option>
-                {classes.map(c => <option key={c._id} value={c._id}>{c.name} – Grade {c.grade}{c.section}</option>)}
+                {classes.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
           </div>

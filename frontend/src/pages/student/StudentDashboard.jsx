@@ -33,7 +33,7 @@ export default function StudentDashboard() {
             <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: 4 }}>Welcome back 👋</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, marginBottom: 4 }}>{student?.name}</h2>
             <div style={{ opacity: 0.85, fontSize: '0.9rem' }}>
-              {student?.class ? `Grade ${student.class.grade} · ${student.class.section}` : ''} · {student?.school?.name}
+              {student?.class ? (student.class.section ? `Grade ${student.class.grade} · ${student.class.section}` : student.class.name) : ''} · {student?.school?.name}
             </div>
           </div>
           <div className="flex gap-4">

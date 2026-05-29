@@ -47,7 +47,7 @@ export default function TeacherStudentDetail() {
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{student.name}</h2>
             <div className="flex gap-4 mt-1" style={{ flexWrap: 'wrap' }}>
               <span className="text-sm text-muted">🏫 {student.school?.name || '—'}</span>
-              <span className="text-sm text-muted">📚 {student.class ? `Grade ${student.class.grade} – ${student.class.section}` : '—'}</span>
+              <span className="text-sm text-muted">📚 {student.class ? (student.class.section ? `Grade ${student.class.grade} – ${student.class.section}` : student.class.name) : '—'}</span>
               <span className="text-sm text-muted">📧 {student.email}</span>
             </div>
           </div>
