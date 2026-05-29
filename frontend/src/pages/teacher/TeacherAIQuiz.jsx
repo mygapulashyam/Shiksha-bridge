@@ -170,7 +170,6 @@ export default function TeacherAIQuiz() {
           {/* Info box */}
           <div style={{ marginTop: 16, padding: 12, background: 'var(--primary-light)', borderRadius: 10, fontSize: '0.8rem', color: 'var(--primary-dark)' }}>
             <strong>ℹ️ How it works:</strong> AI generates NCERT-aligned MCQ questions based on your specifications. You can review, edit, or remove questions before saving as a quiz.
-            <div style={{ marginTop: 6, color: 'var(--gray-500)' }}>Requires NVIDIA_API_KEY in your .env file.</div>
           </div>
         </div>
 
