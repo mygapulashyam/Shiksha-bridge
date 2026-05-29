@@ -72,9 +72,10 @@ export const EmptyState = ({ icon = '📭', title, message, action }) => (
 /* ── Modal ── */
 export const Modal = ({ open, onClose, title, children, size = '' }) => {
   if (!open) return null;
+  const sizeClass = size === 'lg' ? 'modal-lg' : size === 'sm' ? 'modal-sm' : size === 'md' ? 'modal-md' : '';
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${size === 'lg' ? 'modal-lg' : ''}`}>
+      <div className={`modal ${sizeClass}`}>
         <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--gray-200)', paddingBottom: 16 }}>
           <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--gray-500)' }}>✕</button>
