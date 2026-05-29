@@ -122,7 +122,6 @@ export default function AdminClasses() {
     setSaving(true);
     try {
       const payload = { ...editForm, name: autoName(editForm.grade, editForm.section) };
-      if (!payload.classTeacher) delete payload.classTeacher;
       await api.put(`/admin/classes/${editingId}`, payload);
       setSuccess('✅ Class updated successfully!');
       setEditModal(false);
