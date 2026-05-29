@@ -317,6 +317,30 @@ const createClass = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: cls });
 });
 
+const updateClass = asyncHandler(async (req, res) => {
+  const cls = await Class.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  ).populate('school', 'name').populate('classTeacher', 'name');
+  if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
+  res.json({ success: true, data: cls });
+});
+
+const deleteClass = asyncHandler(async (req, res) => {
+  const cls = await Class.findById(req.params.id);
+  if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
+
+  // Remove class reference from students
+  await User.updateMany({ class: cls._id }, { $unset: { class: 1 } });
+  // Remove class from teachers' classes array
+  await User.updateMany({ classes: cls._id }, { $pull: { classes: cls._id } });
+  // Delete the class
+  await Class.findByIdAndDelete(cls._id);
+
+  res.json({ success: true, message: 'Class deleted successfully' });
+});
+
 const ensureStandardClasses = async (schoolId) => {
   if (!schoolId) return;
   const GRADES = [6, 7, 8, 9, 10];
@@ -397,5 +421,5 @@ module.exports = {
   createSubject, getSubjects, updateSubject,
   createConcept, getConcepts,
   getPlatformAnalytics, getSchoolAnalytics,
-  createClass, getClasses,
+  createClass, getClasses, updateClass, deleteClass,
 };

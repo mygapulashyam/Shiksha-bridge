@@ -361,6 +361,8 @@ a:hover { text-decoration: underline; }
   animation: slideUp 0.2s ease;
 }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-sm { max-width: 380px; }
+.modal-md { max-width: 600px; }
 .modal-lg { max-width: 720px; }
 
 /* ── Grid helpers ── */

@@ -15,6 +15,7 @@ import AdminAnalytics   from './pages/admin/AdminAnalytics';
 import AdminSubjects    from './pages/admin/AdminSubjects';
 import AdminImport      from './pages/admin/AdminImport';
 import AdminRankings    from './pages/admin/AdminRankings';
+import AdminClasses     from './pages/admin/AdminClasses';
 
 // Teacher
 import TeacherDashboard    from './pages/teacher/TeacherDashboard';
@@ -62,10 +63,11 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<RoleRedirect />} />
 
-            {/* ── Admin ─────────────────────────────────────── */}
+            {/* ── Admin ────────────────────────────────────────────── */}
             <Route path="/admin"           element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/schools"   element={<ProtectedRoute roles={['admin']}><AdminSchools /></ProtectedRoute>} />
             <Route path="/admin/users"     element={<ProtectedRoute roles={['admin']}><AdminUsers /></ProtectedRoute>} />
+            <Route path="/admin/classes"   element={<ProtectedRoute roles={['admin']}><AdminClasses /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute roles={['admin']}><AdminAnalytics /></ProtectedRoute>} />
             <Route path="/admin/subjects"  element={<ProtectedRoute roles={['admin']}><AdminSubjects /></ProtectedRoute>} />
             <Route path="/admin/import"    element={<ProtectedRoute roles={['admin']}><AdminImport /></ProtectedRoute>} />

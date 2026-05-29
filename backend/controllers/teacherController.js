@@ -192,6 +192,14 @@ const deleteQuestion = asyncHandler(async (req, res) => {
 const getClassPerformance = asyncHandler(async (req, res) => {
   const { classId } = req.params;
 
+  // Ensure the teacher is assigned to this class (admins bypass this check)
+  if (req.user.role === 'teacher') {
+    const assignedIds = (req.user.classes || []).map(id => id.toString());
+    if (!assignedIds.includes(classId.toString())) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
+  }
+
   const students = await User.find({ class: classId, role: 'student', isActive: true })
     .select('name rollNumber streak totalPoints badges');
 
@@ -244,6 +252,15 @@ const getClassPerformance = asyncHandler(async (req, res) => {
 
 const getWeakConcepts = asyncHandler(async (req, res) => {
   const { classId } = req.params;
+
+  // Ensure the teacher is assigned to this class
+  if (req.user.role === 'teacher') {
+    const assignedIds = (req.user.classes || []).map(id => id.toString());
+    if (!assignedIds.includes(classId.toString())) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
+  }
+
   const students = await User.find({ class: classId, role: 'student' }).select('_id');
   const studentIds = students.map((s) => s._id);
 
@@ -378,14 +395,23 @@ const ensureStandardClasses = async (schoolId) => {
 };
 
 const getMyClasses = asyncHandler(async (req, res) => {
-  if (req.user && req.user.school) {
-    await ensureStandardClasses(req.user.school);
+  // Get the teacher's explicitly assigned class IDs from their profile
+  const assignedClassIds = req.user.classes || [];
+
+  // If teacher has no assigned classes, return empty
+  if (!assignedClassIds || assignedClassIds.length === 0) {
+    return res.json({ success: true, data: [] });
   }
-  
+
+  // Fetch only the classes that are assigned to this teacher and are active
   const classes = await Class.find({
-    school: req.user.school,
+    _id: { $in: assignedClassIds },
     isActive: true,
-  }).sort({ grade: 1, section: 1 });
+  })
+    .populate('school', 'name')
+    .populate('classTeacher', 'name')
+    .sort({ grade: 1, section: 1 });
+
   res.json({ success: true, data: classes });
 });
 

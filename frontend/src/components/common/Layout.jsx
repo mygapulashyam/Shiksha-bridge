@@ -8,6 +8,7 @@ const NAV = {
     { to: '/admin',           label: 'Dashboard',         icon: '📊', exact: true },
     { to: '/admin/schools',   label: 'Schools',            icon: '🏫' },
     { to: '/admin/users',     label: 'Users',              icon: '👥' },
+    { to: '/admin/classes',   label: 'Classes',            icon: '🎒' },
     { to: '/admin/subjects',  label: 'Subjects & Concepts',icon: '📚' },
     { to: '/admin/analytics', label: 'Analytics',          icon: '📈' },
     { to: '/admin/import',    label: 'CSV Import',         icon: '📥' },

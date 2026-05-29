@@ -9,6 +9,7 @@ export default function TeacherClassView() {
   const { classId } = useParams();
   const [students, setStudents] = useState([]);
   const [weakConcepts, setWeakConcepts] = useState([]);
+  const [classInfo, setClassInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -17,9 +18,13 @@ export default function TeacherClassView() {
     Promise.all([
       api.get(`/teacher/classes/${classId}/performance`),
       api.get(`/teacher/classes/${classId}/weak-concepts`),
-    ]).then(([s, w]) => {
+      // Fetch the class details from teacher's assigned classes list to get name/grade
+      api.get('/teacher/classes'),
+    ]).then(([s, w, cls]) => {
       setStudents(s.data.data);
       setWeakConcepts(w.data.data);
+      const found = (cls.data.data || []).find(c => c._id === classId);
+      setClassInfo(found || null);
     }).catch(() => setError('Failed to load class data'))
       .finally(() => setLoading(false));
   }, [classId]);
@@ -47,8 +52,11 @@ export default function TeacherClassView() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="page-title">Class Performance</h1>
-            <p className="page-subtitle">{students.length} students · Detailed view</p>
+            <h1 className="page-title">{classInfo ? classInfo.name : 'Class Performance'}</h1>
+            <p className="page-subtitle">
+              {classInfo?.school?.name ? `${classInfo.school.name} · ` : ''}
+              {students.length} students · Detailed view
+            </p>
           </div>
           <Link to="/teacher" className="btn btn-outline btn-sm">← Dashboard</Link>
         </div>

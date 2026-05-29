@@ -9,7 +9,7 @@ const {
   updateSubject,
   createConcept, getConcepts,
   getPlatformAnalytics, getSchoolAnalytics,
-  createClass, getClasses,
+  createClass, getClasses, updateClass, deleteClass,
 } = require('../controllers/adminController');
 
 router.use(protect, authorize('admin'));
@@ -30,6 +30,8 @@ router.patch('/users/:id/toggle-status', toggleUserStatus);
 // Classes
 router.post('/classes', createClass);
 router.get('/classes', getClasses);
+router.put('/classes/:id', updateClass);
+router.delete('/classes/:id', deleteClass);
 
 // Subjects
 router.post('/subjects', createSubject);
