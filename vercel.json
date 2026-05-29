@@ -6,7 +6,7 @@
       "routePrefix": "/"
     },
     "backend": {
-      "entrypoint": "backend/package.json",
+      "entrypoint": "backend/server.js",
       "routePrefix": "/_backend"
     }
   }
