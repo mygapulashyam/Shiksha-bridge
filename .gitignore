@@ -1,0 +1,114 @@
+# ── ShikshaBridge Node & React Global gitignore ──
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented code coverage downloads
+lib-cov
+coverage
+.nyc_output
+
+# Grunt folders
+.grunt
+
+# Bower folders
+bower_components
+
+# node-gyp compilation folder
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Snowpack dependency directory; ephemeral directory
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rts2_cache_x
+.rts2_cache_y
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ── Development & Build Outputs ──
+frontend/build/
+frontend/dist/
+frontend/out/
+backend/dist/
+.next/
+.nuxt/
+.vuepress/dist
+.cache/
+.parcel-cache/
+.docusaurus/
+
+# Serverless directories
+.serverless/
+.vercel/
+
+# Dev-only test and diagnostic scripts
+backend/test-admin-api.js
+backend/test-forgot-password.js
+
+# ── Security & Environment Variables ──
+# Highly critical: keep env variables completely private
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+backend/.env
+frontend/.env
+
+# ── Operating System Files ──
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ── IDE & Editor Specific ──
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
