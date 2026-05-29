@@ -17,6 +17,159 @@ const BLANK_USER = {
 };
 const ROLE_COLORS = { admin: 'badge-danger', teacher: 'badge-success', student: 'badge-info' };
 
+// Inner Component for Grade-Categorized Selection
+function GradeClassSelector({ role, schoolId, selectedValue, onChange, allClasses }) {
+  const [openDropdown, setOpenDropdown] = useState(null); // track open grade dropdown (for teachers)
+
+  // Filter classes by selected school
+  const schoolClasses = allClasses.filter(c => {
+    const sId = typeof c.school === 'object' ? c.school?._id : c.school;
+    return !schoolId || sId === schoolId;
+  });
+
+  const GRADES = [6, 7, 8, 9, 10];
+
+  // Helper to toggle open/close dropdowns
+  const toggleDropdown = (grade) => {
+    setOpenDropdown(openDropdown === grade ? null : grade);
+  };
+
+  // Close dropdown on clicking outside
+  useEffect(() => {
+    if (openDropdown === null) return;
+    const handleOutsideClick = () => setOpenDropdown(null);
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, [openDropdown]);
+
+  return (
+    <div className="grade-select-grid">
+      {GRADES.map(grade => {
+        // Find classes in this school for this specific grade
+        const classesInGrade = schoolClasses.filter(c => c.grade === grade);
+        const hasClasses = classesInGrade.length > 0;
+
+        if (role === 'student') {
+          // Single-select logic for students
+          const isSelectedInThisGrade = classesInGrade.some(c => c._id === selectedValue);
+          const currentSelectValue = isSelectedInThisGrade ? selectedValue : '';
+
+          return (
+            <div key={grade} className="grade-box">
+              <div className="grade-box-label">
+                Class {grade}
+                <span className="grade-box-badge">Std {grade}</span>
+              </div>
+              <select
+                className="form-input form-select"
+                style={{ padding: '8px 10px', fontSize: '0.82rem', height: 38 }}
+                value={currentSelectValue}
+                disabled={!hasClasses}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onChange(val); // will update student's single class selection
+                }}
+              >
+                <option value="">{hasClasses ? 'Select Class' : 'None'}</option>
+                {classesInGrade.map(c => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          );
+        } else {
+          // Multi-select custom dropdown logic for teachers
+          const activeSelected = Array.isArray(selectedValue) ? selectedValue : [];
+          const selectedInThisGrade = classesInGrade.filter(c => activeSelected.includes(c._id));
+          const isOpen = openDropdown === grade;
+
+          return (
+            <div key={grade} className="grade-box" style={{ overflow: 'visible' }}>
+              <div className="grade-box-label">
+                Class {grade}
+                <span className="grade-box-badge">Std {grade}</span>
+              </div>
+              
+              <div className="grade-dropdown-container" onClick={(e) => e.stopPropagation()}>
+                <div 
+                  className={`grade-dropdown-header ${isOpen ? 'active' : ''}`}
+                  onClick={() => toggleDropdown(grade)}
+                >
+                  <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {selectedInThisGrade.length > 0 
+                      ? `${selectedInThisGrade.length} Class${selectedInThisGrade.length > 1 ? 'es' : ''}`
+                      : 'Select Classes'
+                    }
+                  </span>
+                  <span className={`grade-dropdown-arrow ${isOpen ? 'open' : ''}`}>▼</span>
+                </div>
+
+                {isOpen && (
+                  <div className="grade-dropdown-panel">
+                    <div className="grade-dropdown-actions">
+                      <button 
+                        type="button" 
+                        className="grade-dropdown-action-btn"
+                        onClick={() => {
+                          const otherSelected = activeSelected.filter(id => !classesInGrade.some(c => c._id === id));
+                          const newClasses = [...otherSelected, ...classesInGrade.map(c => c._id)];
+                          onChange(newClasses);
+                        }}
+                        disabled={!hasClasses}
+                      >
+                        All
+                      </button>
+                      <button 
+                        type="button" 
+                        className="grade-dropdown-action-btn"
+                        style={{ color: 'var(--gray-500)' }}
+                        onClick={() => {
+                          const otherSelected = activeSelected.filter(id => !classesInGrade.some(c => c._id === id));
+                          onChange(otherSelected);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    {!hasClasses ? (
+                      <div style={{ padding: '8px', color: 'var(--gray-400)', fontSize: '0.78rem', textAlign: 'center' }}>
+                        No classes
+                      </div>
+                    ) : (
+                      classesInGrade.map(c => {
+                        const isChecked = activeSelected.includes(c._id);
+                        return (
+                          <label key={c._id} className="grade-dropdown-item">
+                            <input 
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                let updatedList;
+                                if (isChecked) {
+                                  updatedList = activeSelected.filter(id => id !== c._id);
+                                } else {
+                                  updatedList = [...activeSelected, c._id];
+                                }
+                                onChange(updatedList);
+                              }}
+                            />
+                            <span>{c.name}</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+      })}
+    </div>
+  );
+}
+
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -292,22 +445,25 @@ export default function AdminUsers() {
             </div>
             {form.role === 'student' && (
               <>
-                <div className="form-group">
-                  <label className="form-label">Class</label>
-                  <select className="form-input form-select" value={form.class || ''} onChange={F('class')}>
-                    <option value="">Select Class</option>
-                    {availableClasses.map(c => <option key={c._id} value={c._id}>{c.name} (Grade {c.grade})</option>)}
-                  </select>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontWeight: '700', color: 'var(--primary)' }}>Class Assignment by Grade</label>
+                  <GradeClassSelector
+                    role="student"
+                    schoolId={form.school}
+                    selectedValue={form.class}
+                    onChange={(val) => setForm(p => ({ ...p, class: val }))}
+                    allClasses={classes}
+                  />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">Roll Number</label>
-                  <input className="form-input" value={form.rollNumber} onChange={F('rollNumber')} placeholder="14" />
+                  <input className="form-input" value={form.rollNumber} onChange={F('rollNumber')} placeholder="14" style={{ maxWidth: 240 }} />
                 </div>
               </>
             )}
             {form.role === 'teacher' && (
               <>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
                     <label className="form-label" style={{ marginBottom: 0 }}>Subjects</label>
                     <div className="flex gap-2">
@@ -325,24 +481,16 @@ export default function AdminUsers() {
                     ))}
                   </div>
                 </div>
-                <div className="form-group">
-                  <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-                    <label className="form-label" style={{ marginBottom: 0 }}>Assigned Classes</label>
-                    <div className="flex gap-2">
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(p => ({ ...p, classes: [] }))}>Clear</button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(p => ({ ...p, classes: availableClasses.map(c => c._id) }))}>Select All</button>
-                    </div>
-                  </div>
-                  <div style={{ border: '1px solid var(--gray-200)', borderRadius: 10, padding: 10, maxHeight: 140, overflowY: 'auto' }}>
-                    {availableClasses.length === 0 && <div style={{ color: 'var(--gray-500)', fontSize: '0.82rem' }}>No classes available</div>}
-                    {availableClasses.map(c => (
-                      <label key={c._id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: '0.88rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={(form.classes || []).includes(c._id)} onChange={() => toggleFormArray('classes', c._id)} />
-                        <span>{c.name} (Grade {c.grade}{c.section ? `-${c.section}` : ''})</span>
-                      </label>
-                    ))}
-                  </div>
-                  <small style={{ color: 'var(--gray-500)' }}>Optional: assign one or more classes to this teacher</small>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontWeight: '700', color: 'var(--primary)' }}>Assigned Classes by Grade (Class 6 - 10)</label>
+                  <GradeClassSelector
+                    role="teacher"
+                    schoolId={form.school}
+                    selectedValue={form.classes}
+                    onChange={(val) => setForm(p => ({ ...p, classes: val }))}
+                    allClasses={classes}
+                  />
+                  <small style={{ color: 'var(--gray-500)', marginTop: 8, display: 'block' }}>Optional: assign one or more classes to this teacher</small>
                 </div>
               </>
             )}
@@ -395,22 +543,25 @@ export default function AdminUsers() {
             </div>
             {editForm.role === 'student' && (
               <>
-                <div className="form-group">
-                  <label className="form-label">Class</label>
-                  <select className="form-input form-select" value={editForm.class || ''} onChange={EF('class')}>
-                    <option value="">Select Class</option>
-                    {availableEditClasses.map(c => <option key={c._id} value={c._id}>{c.name} (Grade {c.grade})</option>)}
-                  </select>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontWeight: '700', color: 'var(--primary)' }}>Class Assignment by Grade</label>
+                  <GradeClassSelector
+                    role="student"
+                    schoolId={editForm.school}
+                    selectedValue={editForm.class}
+                    onChange={(val) => setEditForm(p => ({ ...p, class: val }))}
+                    allClasses={classes}
+                  />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">Roll Number</label>
-                  <input className="form-input" value={editForm.rollNumber || ''} onChange={EF('rollNumber')} placeholder="14" />
+                  <input className="form-input" value={editForm.rollNumber || ''} onChange={EF('rollNumber')} placeholder="14" style={{ maxWidth: 240 }} />
                 </div>
               </>
             )}
             {editForm.role === 'teacher' && (
               <>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
                     <label className="form-label" style={{ marginBottom: 0 }}>Subjects</label>
                     <div className="flex gap-2">
@@ -428,24 +579,16 @@ export default function AdminUsers() {
                     ))}
                   </div>
                 </div>
-                <div className="form-group">
-                  <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-                    <label className="form-label" style={{ marginBottom: 0 }}>Assigned Classes</label>
-                    <div className="flex gap-2">
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditForm(p => ({ ...p, classes: [] }))}>Clear</button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditForm(p => ({ ...p, classes: availableEditClasses.map(c => c._id) }))}>Select All</button>
-                    </div>
-                  </div>
-                  <div style={{ border: '1px solid var(--gray-200)', borderRadius: 10, padding: 10, maxHeight: 140, overflowY: 'auto' }}>
-                    {availableEditClasses.length === 0 && <div style={{ color: 'var(--gray-500)', fontSize: '0.82rem' }}>No classes available</div>}
-                    {availableEditClasses.map(c => (
-                      <label key={c._id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: '0.88rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={(editForm.classes || []).includes(c._id)} onChange={() => toggleEditArray('classes', c._id)} />
-                        <span>{c.name} (Grade {c.grade}{c.section ? `-${c.section}` : ''})</span>
-                      </label>
-                    ))}
-                  </div>
-                  <small style={{ color: 'var(--gray-500)' }}>Optional: assign one or more classes to this teacher</small>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontWeight: '700', color: 'var(--primary)' }}>Assigned Classes by Grade (Class 6 - 10)</label>
+                  <GradeClassSelector
+                    role="teacher"
+                    schoolId={editForm.school}
+                    selectedValue={editForm.classes}
+                    onChange={(val) => setEditForm(p => ({ ...p, classes: val }))}
+                    allClasses={classes}
+                  />
+                  <small style={{ color: 'var(--gray-500)', marginTop: 8, display: 'block' }}>Optional: assign one or more classes to this teacher</small>
                 </div>
               </>
             )}
