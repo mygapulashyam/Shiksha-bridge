@@ -441,16 +441,6 @@ const ensureStandardClasses = async (schoolId) => {
 };
 
 const getClasses = asyncHandler(async (req, res) => {
-  if (req.query.school) {
-    await ensureStandardClasses(req.query.school);
-  } else {
-    // Proactively standardize all active schools in the system
-    const schools = await School.find({ isActive: true });
-    for (const school of schools) {
-      await ensureStandardClasses(school._id);
-    }
-  }
-
   const filter = {};
   if (req.query.school) filter.school = req.query.school;
   if (req.query.grade) filter.grade = parseInt(req.query.grade);
