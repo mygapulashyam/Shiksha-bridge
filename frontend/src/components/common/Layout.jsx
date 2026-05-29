@@ -47,8 +47,9 @@ export default function Layout({ children }) {
 
   return (
     <div className="app-layout">
+      <a className="skip-link" href="#main-content">Skip to content</a>
       {sidebarOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99 }}
+        <div className="sidebar-overlay"
           onClick={() => setSidebarOpen(false)} />
       )}
 
@@ -76,7 +77,28 @@ export default function Layout({ children }) {
             <div style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</div>
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem' }}>{ROLE_LABELS[user?.role]}</div>
           </div>
-          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.1rem', padding: 4 }} title="Logout">🚪</button>
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            aria-label="Logout"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              background: 'rgba(255,255,255,0.12)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              borderRadius: '50%',
+              color: '#FFFFFF',
+              cursor: 'pointer',
+              fontSize: '1.05rem',
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            🚪
+          </button>
         </div>
       </nav>
 
@@ -109,7 +131,7 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <main className="page-body">{children}</main>
+        <main id="main-content" className="page-body" tabIndex="-1">{children}</main>
       </div>
     </div>
   );
