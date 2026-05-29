@@ -317,7 +317,69 @@ const createClass = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: cls });
 });
 
+const ensureStandardClasses = async (schoolId) => {
+  if (!schoolId) return;
+  const GRADES = [6, 7, 8, 9, 10];
+  
+  for (const grade of GRADES) {
+    const classes = await Class.find({ school: schoolId, grade });
+    if (classes.length === 0) {
+      // Create missing standard grade class without a section
+      await Class.create({
+        name: `Class ${grade}`,
+        grade,
+        section: '',
+        school: schoolId,
+        academicYear: '2024-25',
+        isActive: true
+      });
+    } else {
+      // Standardize the first one
+      const mainClass = classes[0];
+      if (mainClass.name !== `Class ${grade}` || mainClass.section !== '') {
+        mainClass.name = `Class ${grade}`;
+        mainClass.section = '';
+        await mainClass.save();
+      }
+      
+      // If duplicate sections exist, migrate users and cleanup
+      if (classes.length > 1) {
+        const extraClasses = classes.slice(1);
+        const extraIds = extraClasses.map(c => c._id);
+        
+        // Migrate students to the standardized single class
+        await User.updateMany({ class: { $in: extraIds } }, { class: mainClass._id });
+        
+        // Migrate teachers
+        await User.updateMany(
+          { classes: { $in: extraIds } },
+          { $pull: { classes: { $in: extraIds } } }
+        );
+        // Ensure they have the main consolidated class in their classes array
+        const teachersToUpdate = await User.find({ classes: mainClass._id }).distinct('_id');
+        await User.updateMany(
+          { _id: { $in: teachersToUpdate } },
+          { $addToSet: { classes: mainClass._id } }
+        );
+        
+        // Delete redundant duplicate section classes
+        await Class.deleteMany({ _id: { $in: extraIds } });
+      }
+    }
+  }
+};
+
 const getClasses = asyncHandler(async (req, res) => {
+  if (req.query.school) {
+    await ensureStandardClasses(req.query.school);
+  } else {
+    // Proactively standardize all active schools in the system
+    const schools = await School.find({ isActive: true });
+    for (const school of schools) {
+      await ensureStandardClasses(school._id);
+    }
+  }
+
   const filter = {};
   if (req.query.school) filter.school = req.query.school;
   if (req.query.grade) filter.grade = parseInt(req.query.grade);

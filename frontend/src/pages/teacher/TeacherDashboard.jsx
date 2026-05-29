@@ -76,7 +76,7 @@ export default function TeacherDashboard() {
             <button key={c._id}
               className={`btn btn-sm ${selectedClass?._id === c._id ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setSelectedClass(c)}>
-              Grade {c.grade} – {c.section}
+              {c.name}
             </button>
           ))}
         </div>
@@ -95,7 +95,7 @@ export default function TeacherDashboard() {
       <div className="grid-2 gap-4 mb-6">
         {/* Class Performance Distribution */}
         <div className="card">
-          <SectionHeader title="Class Performance" subtitle={selectedClass ? `Grade ${selectedClass.grade} – ${selectedClass.section}` : ''} />
+          <SectionHeader title="Class Performance" subtitle={selectedClass ? selectedClass.name : ''} />
           {classData?.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={statusData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -152,7 +152,7 @@ export default function TeacherDashboard() {
       <div className="card">
         <SectionHeader
           title="Student Overview"
-          subtitle={selectedClass ? `Grade ${selectedClass.grade}–${selectedClass.section} · ${totalStudents} students` : ''}
+          subtitle={selectedClass ? `${selectedClass.name} · ${totalStudents} students` : ''}
           action={selectedClass && <Link to={`/teacher/class/${selectedClass._id}`} className="btn btn-outline btn-sm">Full Class View →</Link>}
         />
         {!classData || classData.length === 0 ? (

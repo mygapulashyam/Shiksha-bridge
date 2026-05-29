@@ -147,7 +147,7 @@ export default function TeacherDoubts() {
             <button key={c._id} className={`btn btn-sm ${selectedClass === c._id ? 'btn-primary' : 'btn-ghost'}`}
               style={{ border: '1px solid var(--gray-200)' }}
               onClick={() => handleClassChange(c._id)}>
-              Grade {c.grade} – {c.section}
+              {c.name}
             </button>
           ))}
         </div>

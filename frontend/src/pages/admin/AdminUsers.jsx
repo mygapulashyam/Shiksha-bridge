@@ -371,7 +371,7 @@ export default function AdminUsers() {
                     <td style={{ color: 'var(--gray-500)', fontSize: '0.85rem' }}>{u.email}</td>
                     <td><span className={`badge ${ROLE_COLORS[u.role]}`} style={{ textTransform: 'capitalize' }}>{u.role}</span></td>
                     <td style={{ fontSize: '0.85rem' }}>{u.school?.name || '—'}</td>
-                    <td style={{ fontSize: '0.85rem' }}>{u.class ? `Gr ${u.class?.grade} ${u.class?.section}` : '—'}</td>
+                    <td style={{ fontSize: '0.85rem' }}>{u.class ? u.class.name : '—'}</td>
                     <td style={{ fontSize: '0.82rem' }}>
                       <div style={{ color: 'var(--gray-700)', marginBottom: 6 }}>
                         {u.role === 'teacher' ? `Subjects: ${u.subjects?.length || 0} · Classes: ${u.classes?.length || 0}` : '—'}
