@@ -81,6 +81,7 @@ backend/dist/
 # Dev-only test and diagnostic scripts
 backend/test-admin-api.js
 backend/test-forgot-password.js
+backend/seed-admin.js
 
 # ── Security & Environment Variables ──
 # Highly critical: keep env variables completely private
