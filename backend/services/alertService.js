@@ -192,7 +192,13 @@ const checkClassAverageDrops = async (schoolId) => {
     const exists = await Alert.findOne({ dedupeKey: weekKey });
     if (exists) continue;
 
-    const teachers = await User.find({ classes: cls._id, role: 'teacher' }).lean();
+    const teachers = await User.find({
+      role: 'teacher',
+      $or: [
+        { classes: cls._id },
+        { _id: cls.classTeacher },
+      ],
+    }).lean();
     for (const teacher of teachers) {
       await Alert.create({
         teacher: teacher._id,

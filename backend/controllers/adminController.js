@@ -6,6 +6,10 @@ const { Quiz, Question } = require('../models/QuizQuestion');
 const { Attempt, Recommendation, ProgressReport } = require('../models/AttemptRecommendation');
 const { paginate } = require('../utils/pagination');
 const { asyncHandler } = require('../middleware/errorHandler');
+const {
+  syncClassTeacherLink,
+  syncTeacherClassAssignments,
+} = require('../services/classAssignmentSyncService');
 
 /* ═══════════════════════════════════════════
    SCHOOLS
@@ -77,6 +81,8 @@ const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+  const previousClassIds = [...(user.classes || [])];
+
   const allowed = [
     'name',
     'email',
@@ -135,6 +141,20 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 
   await user.save();
+
+  if (user.role === 'teacher') {
+    await syncTeacherClassAssignments({
+      teacherId: user._id,
+      previousClassIds,
+      nextClassIds: user.classes || [],
+    });
+  } else if (previousClassIds.length > 0) {
+    await syncTeacherClassAssignments({
+      teacherId: user._id,
+      previousClassIds,
+      nextClassIds: [],
+    });
+  }
 
   const updated = await User.findById(user._id)
     .populate('school', 'name district')
@@ -314,16 +334,43 @@ const getSchoolAnalytics = asyncHandler(async (req, res) => {
 ═══════════════════════════════════════════ */
 const createClass = asyncHandler(async (req, res) => {
   const cls = await Class.create(req.body);
+
+  await syncClassTeacherLink({
+    classId: cls._id,
+    nextTeacherId: cls.classTeacher,
+  });
+
+  await cls.populate('school', 'name');
+  await cls.populate('classTeacher', 'name');
+
   res.status(201).json({ success: true, data: cls });
 });
 
 const updateClass = asyncHandler(async (req, res) => {
-  const cls = await Class.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true, runValidators: true }
-  ).populate('school', 'name').populate('classTeacher', 'name');
+  const cls = await Class.findById(req.params.id);
   if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
+
+  const previousTeacherId = cls.classTeacher;
+
+  Object.entries(req.body).forEach(([field, value]) => {
+    if (field === 'classTeacher') {
+      cls.classTeacher = (value === '' || value === null) ? undefined : value;
+      return;
+    }
+
+    cls[field] = value;
+  });
+
+  await cls.save();
+
+  await syncClassTeacherLink({
+    classId: cls._id,
+    previousTeacherId,
+    nextTeacherId: cls.classTeacher,
+  });
+
+  await cls.populate('school', 'name');
+  await cls.populate('classTeacher', 'name');
   res.json({ success: true, data: cls });
 });
 

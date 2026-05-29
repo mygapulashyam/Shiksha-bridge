@@ -6,6 +6,7 @@ const { Attempt, Recommendation, ProgressReport } = require('../models/AttemptRe
 const { paginate } = require('../utils/pagination');
 const { asyncHandler } = require('../middleware/errorHandler');
 const mongoose = require('mongoose');
+const { teacherHasClassAccess } = require('../services/classAssignmentSyncService');
 
 /* ═══════════════════════════════════════════
    QUIZ MANAGEMENT
@@ -191,11 +192,11 @@ const deleteQuestion = asyncHandler(async (req, res) => {
 ═══════════════════════════════════════════ */
 const getClassPerformance = asyncHandler(async (req, res) => {
   const { classId } = req.params;
+  const classRecord = await Class.findById(classId).select('classTeacher');
 
   // Ensure the teacher is assigned to this class (admins bypass this check)
   if (req.user.role === 'teacher') {
-    const assignedIds = (req.user.classes || []).map(id => id.toString());
-    if (!assignedIds.includes(classId.toString())) {
+    if (!teacherHasClassAccess(req.user, classId, classRecord?.classTeacher)) {
       return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
     }
   }
@@ -252,11 +253,11 @@ const getClassPerformance = asyncHandler(async (req, res) => {
 
 const getWeakConcepts = asyncHandler(async (req, res) => {
   const { classId } = req.params;
+  const classRecord = await Class.findById(classId).select('classTeacher');
 
   // Ensure the teacher is assigned to this class
   if (req.user.role === 'teacher') {
-    const assignedIds = (req.user.classes || []).map(id => id.toString());
-    if (!assignedIds.includes(classId.toString())) {
+    if (!teacherHasClassAccess(req.user, classId, classRecord?.classTeacher)) {
       return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
     }
   }
@@ -395,7 +396,7 @@ const ensureStandardClasses = async (schoolId) => {
 };
 
 const getMyClasses = asyncHandler(async (req, res) => {
-  // Get the teacher's explicitly assigned class IDs from their profile
+  // Prefer the teacher profile, but fall back to class documents for stale records.
   const assignedClassIds = req.user.classes || [];
 
   // If teacher has no assigned classes, return empty
@@ -403,9 +404,11 @@ const getMyClasses = asyncHandler(async (req, res) => {
     return res.json({ success: true, data: [] });
   }
 
-  // Fetch only the classes that are assigned to this teacher and are active
   const classes = await Class.find({
-    _id: { $in: assignedClassIds },
+    $or: [
+      { _id: { $in: assignedClassIds } },
+      { classTeacher: req.user._id },
+    ],
     isActive: true,
   })
     .populate('school', 'name')

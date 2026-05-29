@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const crypto = require('crypto');
 const User = require('../models/User');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { syncTeacherClassAssignments } = require('../services/classAssignmentSyncService');
 
 const register = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -33,6 +34,15 @@ const register = asyncHandler(async (req, res) => {
   }
 
   const user = await User.create(payload);
+
+  if (user.role === 'teacher' && Array.isArray(payload.classes) && payload.classes.length > 0) {
+    await syncTeacherClassAssignments({
+      teacherId: user._id,
+      previousClassIds: [],
+      nextClassIds: payload.classes,
+    });
+  }
+
   res.status(201).json({ success: true, message: 'User registered', data: { _id: user._id, name: user.name, email: user.email, role: user.role } });
 });
 
