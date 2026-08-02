@@ -13,6 +13,8 @@ const { generateParentReport } = require('../services/pdfReportService');
 const { generateParentReportSummary } = require('../services/aiService');
 const mongoose = require('mongoose');
 
+const { isValidConceptId } = require('../utils/validators');
+
 /* ══════════════════════════════════════════════════
    QUIZZES
 ══════════════════════════════════════════════════ */
@@ -52,7 +54,13 @@ const getQuizForAttempt = asyncHandler(async (req, res) => {
     .populate('concepts', 'name chapter')
     .populate({ path: 'questions.question', select: '-correctAnswer', populate: { path: 'concept', select: 'name' } });
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
-  const questionsShuffled = [...quiz.questions].sort(() => Math.random() - 0.5);
+
+  const questionsShuffled = [...quiz.questions];
+  for (let i = questionsShuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [questionsShuffled[i], questionsShuffled[j]] = [questionsShuffled[j], questionsShuffled[i]];
+  }
+
   res.json({ success: true, data: { _id: quiz._id, title: quiz.title, description: quiz.description, type: quiz.type, subject: quiz.subject, duration: quiz.duration, totalMarks: quiz.totalMarks, questions: questionsShuffled } });
 });
 
@@ -64,14 +72,40 @@ const startAttempt = asyncHandler(async (req, res) => {
   const student = req.user;
   const quiz = await Quiz.findById(quizId);
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
+
+  const existingAttempt = await Attempt.findOne({ student: student._id, quiz: quizId, status: 'in_progress' });
+  if (existingAttempt) {
+    return res.status(200).json({ success: true, data: { attemptId: existingAttempt._id, answers: existingAttempt.answers, timeTaken: existingAttempt.timeTaken } });
+  }
+
   const prevAttempts = await Attempt.countDocuments({ student: student._id, quiz: quizId });
   const attempt = await Attempt.create({ student: student._id, quiz: quizId, school: student.school, class: student.class, subject: quiz.subject, totalMarks: quiz.totalMarks, status: 'in_progress', attemptNumber: prevAttempts + 1 });
   res.status(201).json({ success: true, data: { attemptId: attempt._id } });
 });
 
+const saveAnswers = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { answers = [], timeTaken } = req.body;
+  const attempt = await Attempt.findById(id);
+  if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
+  if (attempt.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorised' });
+  if (attempt.status === 'completed') return res.status(400).json({ success: false, message: 'Quiz already completed' });
+
+  attempt.answers = answers.map(a => ({
+    question: a.questionId || a.question,
+    selectedOption: a.selectedOption,
+    enteredAnswer: a.enteredAnswer,
+    timeTaken: a.timeTaken,
+  }));
+  if (timeTaken !== undefined) {
+    attempt.timeTaken = timeTaken;
+  }
+  await attempt.save();
+  res.json({ success: true, message: 'Answers saved' });
+});
+
 const submitAttempt = asyncHandler(async (req, res) => {
   const { attemptId, answers = [] } = req.body;
-  const isValidConceptId = (conceptId) => mongoose.Types.ObjectId.isValid(conceptId);
   const attempt = await Attempt.findById(attemptId);
   if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
   if (attempt.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorised' });
@@ -355,6 +389,13 @@ const downloadParentReport = asyncHandler(async (req, res) => {
   ]);
   if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
+  if (req.user.role === 'student' && studentId.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ success: false, message: 'Not authorised' });
+  }
+  if (req.user.role === 'teacher' && student.school?._id?.toString() !== req.user.school?.toString()) {
+    return res.status(403).json({ success: false, message: 'Not authorised' });
+  }
+
   // AI or rule-based summary
   const mainReport = reports[0];
   const weakConcepts = mainReport?.weakConcepts?.map(c => c.name || c.conceptName) || [];
@@ -417,7 +458,7 @@ const getStudentSubjects = asyncHandler(async (req, res) => {
 
 module.exports = {
   getAvailableQuizzes, getQuizForAttempt,
-  startAttempt, submitAttempt,
+  startAttempt, saveAnswers, submitAttempt,
   getDashboard, getMyAttempts, getAttemptDetail,
   getMyRecommendations, updateRecommendationStatus,
   getLearningPaths, advanceLearningPath,

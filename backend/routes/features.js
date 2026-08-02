@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/role');
+const { verifyStudentAccess, verifyClassAccess } = require('../middleware/accessControl');
 const {
   aiGenerateQuestions,
   validateQuiz,
@@ -28,11 +29,11 @@ router.patch('/alerts/read-all', protect, authorize('teacher', 'admin'), markAll
 router.post('/alerts/run-checks', protect, authorize('admin'), triggerScheduledAlerts);
 
 // Heatmaps
-router.get('/heatmap/student/:studentId', protect, authorize('teacher', 'admin', 'student'), getStudentHeatmap);
-router.get('/heatmap/class/:classId', protect, authorize('teacher', 'admin'), getClassHeatmap);
+router.get('/heatmap/student/:studentId', protect, authorize('teacher', 'admin', 'student'), verifyStudentAccess, getStudentHeatmap);
+router.get('/heatmap/class/:classId', protect, authorize('teacher', 'admin'), verifyClassAccess, getClassHeatmap);
 
 // Doubts (teacher side)
-router.get('/doubts/class/:classId', protect, authorize('teacher', 'admin'), getClassDoubts);
+router.get('/doubts/class/:classId', protect, authorize('teacher', 'admin'), verifyClassAccess, getClassDoubts);
 router.patch('/doubts/:id/answer', protect, authorize('teacher', 'admin'), answerDoubt);
 
 // Content Resource Library
@@ -45,12 +46,12 @@ router.post('/import/:type', protect, authorize('admin'), importCSV);
 router.get('/import/:type/template', protect, authorize('admin'), getCSVTemplateDownload);
 
 // Improvement Tracking
-router.get('/improvement/:studentId', protect, authorize('teacher', 'admin'), getImprovementTracking);
+router.get('/improvement/:studentId', protect, authorize('teacher', 'admin'), verifyStudentAccess, getImprovementTracking);
 
 // District Rankings – admin only
 router.get('/district-rankings', protect, authorize('admin'), getDistrictRankings);
 
 // Parent report for specific student (teacher/admin)
-router.get('/report/student/:studentId/pdf', protect, authorize('teacher', 'admin'), require('../controllers/studentController').downloadParentReport);
+router.get('/report/student/:studentId/pdf', protect, authorize('teacher', 'admin'), verifyStudentAccess, require('../controllers/studentController').downloadParentReport);
 
 module.exports = router;

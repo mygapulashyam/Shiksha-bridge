@@ -341,9 +341,19 @@ export default function LoginPage() {
             </form>
           )}
 
-          <p style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: '0.8rem', marginTop: 24 }}>
-            {t('contact_admin')}
-          </p>
+          <div style={{
+            marginTop: 32,
+            padding: '12px 16px',
+            backgroundColor: 'var(--gray-50)',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--gray-200)',
+            fontSize: '0.82rem',
+            color: 'var(--gray-600)',
+            lineHeight: 1.5,
+            textAlign: 'center'
+          }}>
+            ℹ️ <strong>Account Notice:</strong> User registration for this application is managed directly by the administrator to maintain clean and accurate school records. Self-registration is not available. Please contact your school administrator if you need access.
+          </div>
         </div>
       </div>
     </div>

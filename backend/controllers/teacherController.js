@@ -7,6 +7,7 @@ const { paginate } = require('../utils/pagination');
 const { asyncHandler } = require('../middleware/errorHandler');
 const mongoose = require('mongoose');
 const { teacherHasClassAccess } = require('../services/classAssignmentSyncService');
+const { validateQuizForPublishing } = require('../services/quizValidatorService');
 
 /* ═══════════════════════════════════════════
    QUIZ MANAGEMENT
@@ -72,7 +73,11 @@ const updateQuiz = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Not authorised' });
   }
 
-  Object.assign(quiz, req.body);
+  const allowed = ['title', 'description', 'duration', 'totalMarks', 'isPublished', 'grade', 'subject', 'class', 'concepts', 'questions', 'isActive'];
+  allowed.forEach(k => {
+    if (req.body[k] !== undefined) quiz[k] = req.body[k];
+  });
+
   await quiz.save();
   res.json({ success: true, data: quiz });
 });
@@ -80,6 +85,15 @@ const updateQuiz = asyncHandler(async (req, res) => {
 const publishQuiz = asyncHandler(async (req, res) => {
   const quiz = await Quiz.findById(req.params.id);
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
+  if (quiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Not authorised' });
+  }
+
+  // Validate quiz before publishing
+  const validation = await validateQuizForPublishing(req.params.id);
+  if (!validation.valid) {
+    return res.status(400).json({ success: false, message: 'Quiz validation failed', errors: validation.errors });
+  }
 
   quiz.isPublished = true;
   quiz.publishedAt = new Date();
@@ -90,6 +104,9 @@ const publishQuiz = asyncHandler(async (req, res) => {
 const deleteQuiz = asyncHandler(async (req, res) => {
   const quiz = await Quiz.findById(req.params.id);
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
+  if (quiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Not authorised' });
+  }
 
   // Permanently delete the quiz
   await Quiz.findByIdAndDelete(req.params.id);
@@ -166,7 +183,11 @@ const updateQuestion = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Not authorised' });
   }
 
-  Object.assign(question, req.body);
+  const allowed = ['text', 'textHindi', 'type', 'options', 'correctAnswer', 'marks', 'difficulty', 'subject', 'concept', 'isActive'];
+  allowed.forEach(k => {
+    if (req.body[k] !== undefined) question[k] = req.body[k];
+  });
+
   await question.save();
   res.json({ success: true, data: question });
 });
@@ -322,6 +343,9 @@ const getStudentDetail = asyncHandler(async (req, res) => {
   ]);
 
   if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+  if (req.user.role === 'teacher' && student.school?.toString() !== req.user.school?.toString()) {
+    return res.status(403).json({ success: false, message: 'Not authorised to view this student' });
+  }
 
   res.json({ success: true, data: { student, attempts, recommendations } });
 });
@@ -343,57 +367,6 @@ const getMyStudents = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result });
 });
 
-const ensureStandardClasses = async (schoolId) => {
-  if (!schoolId) return;
-  const GRADES = [6, 7, 8, 9, 10];
-  
-  for (const grade of GRADES) {
-    const classes = await Class.find({ school: schoolId, grade });
-    if (classes.length === 0) {
-      // Create missing standard grade class without a section
-      await Class.create({
-        name: `Class ${grade}`,
-        grade,
-        section: '',
-        school: schoolId,
-        academicYear: '2024-25',
-        isActive: true
-      });
-    } else {
-      // Standardize the first one
-      const mainClass = classes[0];
-      if (mainClass.name !== `Class ${grade}` || mainClass.section !== '') {
-        mainClass.name = `Class ${grade}`;
-        mainClass.section = '';
-        await mainClass.save();
-      }
-      
-      // If duplicate sections exist, migrate users and cleanup
-      if (classes.length > 1) {
-        const extraClasses = classes.slice(1);
-        const extraIds = extraClasses.map(c => c._id);
-        
-        // Migrate students to the standardized single class
-        await User.updateMany({ class: { $in: extraIds } }, { class: mainClass._id });
-        
-        // Migrate teachers
-        await User.updateMany(
-          { classes: { $in: extraIds } },
-          { $pull: { classes: { $in: extraIds } } }
-        );
-        // Ensure they have the main consolidated class in their classes array
-        const teachersToUpdate = await User.find({ classes: mainClass._id }).distinct('_id');
-        await User.updateMany(
-          { _id: { $in: teachersToUpdate } },
-          { $addToSet: { classes: mainClass._id } }
-        );
-        
-        // Delete redundant duplicate section classes
-        await Class.deleteMany({ _id: { $in: extraIds } });
-      }
-    }
-  }
-};
 
 const getMyClasses = asyncHandler(async (req, res) => {
   // Prefer the teacher profile, but fall back to class documents for stale records.

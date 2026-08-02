@@ -3,6 +3,7 @@ const { Concept } = require('../models/ClassSubjectConcept');
 const { Quiz } = require('../models/QuizQuestion');
 const { ContentResource } = require('../models/LearningPathDoubtContent');
 const mongoose = require('mongoose');
+const { isValidConceptId } = require('../utils/validators');
 
 /**
  * ─── Feature 2: Personalized Learning Path Generator ────────────────────────
@@ -17,7 +18,6 @@ const mongoose = require('mongoose');
 
 const buildLearningPath = async (student, attempt) => {
   const paths = [];
-  const isValidConceptId = (conceptId) => mongoose.Types.ObjectId.isValid(conceptId);
 
   for (const cs of attempt.conceptScores) {
     if (!isValidConceptId(cs.concept)) continue;

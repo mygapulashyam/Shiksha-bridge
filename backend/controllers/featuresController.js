@@ -11,6 +11,7 @@ const { Quiz, Question } = require('../models/QuizQuestion');
 const { Class, Subject, Concept } = require('../models/ClassSubjectConcept');
 const User = require('../models/User');
 const { paginate } = require('../utils/pagination');
+const { teacherHasClassAccess } = require('../services/classAssignmentSyncService');
 
 // Multer – in-memory CSV storage
 const csvStorage = multer.memoryStorage();
@@ -33,6 +34,22 @@ const aiGenerateQuestions = asyncHandler(async (req, res) => {
 
   if (!grade || !subject || !chapter) {
     return res.status(400).json({ success: false, message: 'grade, subject, and chapter are required' });
+  }
+
+  // Quota enforcement
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+  const now = new Date();
+  const resetDate = user.aiGenerationsResetDate || now;
+  if (now.toDateString() !== resetDate.toDateString()) {
+    user.aiGenerationsCount = 0;
+    user.aiGenerationsResetDate = now;
+  }
+
+  const MAX_DAILY_AI_GENERATIONS = 10;
+  if (user.aiGenerationsCount >= MAX_DAILY_AI_GENERATIONS) {
+    return res.status(429).json({ success: false, message: 'Daily AI quiz generation quota exceeded. Please try again tomorrow.' });
   }
 
   // Get concept name and fallback conceptId if not selected
@@ -68,6 +85,10 @@ const aiGenerateQuestions = asyncHandler(async (req, res) => {
   if (result.error && !result.questions.length) {
     return res.status(503).json({ success: false, message: result.error });
   }
+
+  // Increment AI generation usage count
+  user.aiGenerationsCount += 1;
+  await user.save({ validateBeforeSave: false });
 
   res.json({
     success: true,
@@ -145,6 +166,16 @@ const triggerScheduledAlerts = asyncHandler(async (req, res) => {
 ════════════════════════════════════════════════════ */
 const getStudentHeatmap = asyncHandler(async (req, res) => {
   const studentId = req.params.studentId;
+  const student = await User.findById(studentId);
+  if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+  if (req.user.role === 'student' && studentId !== req.user._id.toString()) {
+    return res.status(403).json({ success: false, message: 'Not authorised to view this heatmap' });
+  }
+  if (req.user.role === 'teacher' && student.school?.toString() !== req.user.school?.toString()) {
+    return res.status(403).json({ success: false, message: 'Not authorised to view this student\'s heatmap' });
+  }
+
   const subjectFilter = req.query.subject ? { subject: req.query.subject } : {};
 
   const attempts = await Attempt.find({ student: studentId, status: 'completed', ...subjectFilter })
@@ -195,6 +226,15 @@ const getStudentHeatmap = asyncHandler(async (req, res) => {
 
 const getClassHeatmap = asyncHandler(async (req, res) => {
   const { classId } = req.params;
+  const classRecord = await Class.findById(classId).select('classTeacher');
+  if (!classRecord) return res.status(404).json({ success: false, message: 'Class not found' });
+
+  if (req.user.role === 'teacher') {
+    if (!teacherHasClassAccess(req.user, classId, classRecord?.classTeacher)) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
+  }
+
   const students = await User.find({ class: classId, role: 'student', isActive: true }).select('_id name').lean();
   const studentIds = students.map(s => s._id);
 
@@ -242,6 +282,15 @@ const getClassHeatmap = asyncHandler(async (req, res) => {
 ════════════════════════════════════════════════════ */
 const getClassDoubts = asyncHandler(async (req, res) => {
   const { classId } = req.params;
+  const classRecord = await Class.findById(classId).select('classTeacher');
+  if (!classRecord) return res.status(404).json({ success: false, message: 'Class not found' });
+
+  if (req.user.role === 'teacher') {
+    if (!teacherHasClassAccess(req.user, classId, classRecord?.classTeacher)) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+    }
+  }
+
   const filter = { class: classId };
   if (req.query.status) filter.status = req.query.status;
   if (req.query.concept) filter.concept = req.query.concept;
@@ -256,12 +305,23 @@ const getClassDoubts = asyncHandler(async (req, res) => {
 const answerDoubt = asyncHandler(async (req, res) => {
   const { answer, answerHindi } = req.body;
   if (!answer?.trim()) return res.status(400).json({ success: false, message: 'Answer is required' });
-  const doubt = await Doubt.findByIdAndUpdate(
-    req.params.id,
-    { answer: answer.trim(), answerHindi, status: 'answered', answeredBy: req.user._id, answeredAt: new Date() },
-    { new: true }
-  );
+  const doubt = await Doubt.findById(req.params.id);
   if (!doubt) return res.status(404).json({ success: false, message: 'Doubt not found' });
+
+  if (req.user.role === 'teacher') {
+    const classRecord = await Class.findById(doubt.class).select('classTeacher');
+    if (!teacherHasClassAccess(req.user, doubt.class?.toString(), classRecord?.classTeacher)) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to answer doubts for this class' });
+    }
+  }
+
+  doubt.answer = answer.trim();
+  doubt.answerHindi = answerHindi;
+  doubt.status = 'answered';
+  doubt.answeredBy = req.user._id;
+  doubt.answeredAt = new Date();
+  await doubt.save();
+
   res.json({ success: true, data: doubt });
 });
 
@@ -302,6 +362,13 @@ const importCSV = asyncHandler(async (req, res) => {
 
   await new Promise((resolve, reject) => csvUpload(req, res, err => err ? reject(err) : resolve()));
   if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+  // Validate that the file is actually a CSV (check first line of content)
+  const fileContent = req.file.buffer.toString('utf8');
+  const firstLine = fileContent.split('\n')[0]?.trim();
+  if (!firstLine || firstLine.includes('<!DOCTYPE html>') || firstLine.includes('<html') || (firstLine.includes(',') === false && firstLine.includes(';') === false && firstLine.includes('\t') === false)) {
+    return res.status(400).json({ success: false, message: 'Uploaded file is not a valid CSV format' });
+  }
 
   let result;
   try {

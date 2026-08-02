@@ -3,12 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import { Alert, PageLoader } from '../../components/common/UI';
 import api from '../../api/axios';
+import { useLanguage } from '../../context/LanguageContext';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 export default function StudentAttempt() {
   const { id: quizId } = useParams();
   const navigate = useNavigate();
+  const { currentLanguage } = useLanguage();
 
   const [quiz, setQuiz] = useState(null);
   const [attemptId, setAttemptId] = useState(null);
@@ -33,7 +35,25 @@ export default function StudentAttempt() {
         ]);
         setQuiz(qRes.data.data);
         setAttemptId(aRes.data.data.attemptId);
-        setTimeLeft(qRes.data.data.duration * 60);
+
+        // Load resumed answers
+        if (aRes.data.data.answers && aRes.data.data.answers.length > 0) {
+          const mappedAnswers = {};
+          aRes.data.data.answers.forEach(a => {
+            mappedAnswers[a.question] = {
+              questionId: a.question,
+              selectedOption: a.selectedOption,
+              enteredAnswer: a.enteredAnswer,
+              timeTaken: a.timeTaken,
+            };
+          });
+          setAnswers(mappedAnswers);
+        }
+
+        const durationSec = qRes.data.data.duration * 60;
+        const timeTaken = aRes.data.data.timeTaken || 0;
+        const remaining = Math.max(0, durationSec - timeTaken);
+        setTimeLeft(remaining);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to start quiz');
       } finally {
@@ -50,6 +70,34 @@ export default function StudentAttempt() {
     timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000);
     return () => clearTimeout(timerRef.current);
   }, [timeLeft]);
+
+  // Autosave answers when they change
+  useEffect(() => {
+    if (!attemptId || Object.keys(answers).length === 0) return;
+
+    const delayDebounceFn = setTimeout(() => {
+      const answersArr = Object.values(answers);
+      const totalTime = Math.round((Date.now() - startedAt) / 1000);
+      api.patch(`/student/attempts/${attemptId}/answers`, {
+        answers: answersArr,
+        timeTaken: totalTime,
+      }).catch(err => console.error('Autosave failed:', err));
+    }, 2000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [answers, attemptId, startedAt]);
+
+  // Before unload listener to warn leaving page
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!submittingRef.current) {
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to leave? Your quiz attempt progress will be saved but the timer will keep running.';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   const handleAnswer = (questionId, type, value) => {
     setAnswers(prev => ({
@@ -177,9 +225,14 @@ export default function StudentAttempt() {
 
           {/* Question Text */}
           <p style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--gray-900)', lineHeight: 1.6, marginBottom: 8 }}>
-            {question.text}
+            {(currentLanguage === 'hi' && question.textHindi) ? question.textHindi : question.text}
           </p>
-          {question.textHindi && (
+          {(currentLanguage === 'hi' && question.textHindi) && question.text && (
+            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: 20 }}>
+              {question.text}
+            </p>
+          )}
+          {currentLanguage !== 'hi' && question.textHindi && (
             <p style={{ fontSize: '0.95rem', color: 'var(--gray-600)', lineHeight: 1.5, marginBottom: 20, fontFamily: 'var(--font-devanagari)', padding: '8px 14px', background: 'var(--gray-50)', borderRadius: 8 }}>
               {question.textHindi}
             </p>
@@ -199,7 +252,7 @@ export default function StudentAttempt() {
                     }}>
                     {opt.label}
                   </span>
-                  <span style={{ flex: 1 }}>{opt.text}</span>
+                  <span style={{ flex: 1 }}>{(currentLanguage === 'hi' && opt.textHindi) ? opt.textHindi : opt.text}</span>
                   {currentAnswer.selectedOption === opt.label && <span>✓</span>}
                 </button>
               ))}
