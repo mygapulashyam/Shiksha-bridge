@@ -3,6 +3,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/role');
+const { verifyStudentAccess, verifyClassAccess } = require('../middleware/accessControl');
 const {
   createQuiz, getMyQuizzes, getQuiz, updateQuiz, publishQuiz, deleteQuiz,
   createQuestion, bulkCreateQuestions, getQuestions, updateQuestion, deleteQuestion,
@@ -33,9 +34,9 @@ router.put('/questions/:id', updateQuestion);
 router.delete('/questions/:id', deleteQuestion);
 
 // Analytics
-router.get('/classes/:classId/performance', getClassPerformance);
-router.get('/classes/:classId/weak-concepts', getWeakConcepts);
-router.get('/students/:studentId/detail', getStudentDetail);
+router.get('/classes/:classId/performance', verifyClassAccess, getClassPerformance);
+router.get('/classes/:classId/weak-concepts', verifyClassAccess, getWeakConcepts);
+router.get('/students/:studentId/detail', verifyStudentAccess, getStudentDetail);
 
 // Students & Classes
 router.get('/students', getMyStudents);

@@ -4,7 +4,7 @@ const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/role');
 const {
   getAvailableQuizzes, getQuizForAttempt,
-  startAttempt, submitAttempt,
+  startAttempt, saveAnswers, submitAttempt,
   getDashboard, getMyAttempts, getAttemptDetail,
   getMyRecommendations, updateRecommendationStatus,
   getLearningPaths, advanceLearningPath,
@@ -21,6 +21,7 @@ router.get('/dashboard', authorize('student'), getDashboard);
 router.get('/quizzes', getAvailableQuizzes);
 router.get('/quizzes/:id', getQuizForAttempt);
 router.post('/attempts/start', startAttempt);
+router.patch('/attempts/:id/answers', authorize('student'), saveAnswers);
 router.post('/attempts/submit', submitAttempt);
 router.get('/attempts', getMyAttempts);
 router.get('/attempts/:id', getAttemptDetail);

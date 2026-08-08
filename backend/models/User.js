@@ -49,6 +49,10 @@ const userSchema = new mongoose.Schema(
     // Preferences
     voiceEnabled: { type: Boolean, default: false },
     offlineMode: { type: Boolean, default: false },
+
+    // Quota Limit
+    aiGenerationsCount: { type: Number, default: 0 },
+    aiGenerationsResetDate: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );

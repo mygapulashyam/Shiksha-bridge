@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { Attempt } = require('../models/AttemptRecommendation');
 const { Class } = require('../models/ClassSubjectConcept');
 const mongoose = require('mongoose');
+const { isValidConceptId } = require('../utils/validators');
 
 /**
  * ─── Feature 3: Teacher Intervention Alerts ──────────────────────────────────
@@ -72,7 +73,6 @@ const checkLowScore = async (attempt, student, teacher) => {
 
 // ─── Alert Type: Repeated Failure (3+ times on same concept) ─────────────────
 const checkRepeatedFailure = async (attempt, student, teacher) => {
-  const isValidConceptId = (conceptId) => mongoose.Types.ObjectId.isValid(conceptId);
 
   for (const cs of (attempt.conceptScores || [])) {
     if (!isValidConceptId(cs.concept)) continue;

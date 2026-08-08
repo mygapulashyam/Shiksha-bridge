@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'MONGO_URI'];
+for (const varName of REQUIRED_ENV_VARS) {
+  if (!process.env[varName]) {
+    console.error(`FATAL ERROR: Environment variable "${varName}" is missing.`);
+    process.exit(1);
+  }
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -29,7 +38,30 @@ app.use(cors(corsOptions));
 // Handle preflight OPTIONS requests immediately
 app.options('*', cors(corsOptions));
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", process.env.CORS_ORIGIN || 'http://localhost:3000'],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: {
+      action: 'deny',
+    },
+  })
+);
 app.use(mongoSanitize());
 
 // ── Rate limiters (after CORS so 429 responses still have CORS headers)

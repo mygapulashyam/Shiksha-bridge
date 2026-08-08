@@ -1,6 +1,7 @@
 const { Recommendation } = require('../models/AttemptRecommendation');
 const { Quiz } = require('../models/QuizQuestion');
 const mongoose = require('mongoose');
+const { isValidConceptId } = require('../utils/validators');
 
 /**
  * RULE-BASED RECOMMENDATION ENGINE
@@ -8,7 +9,8 @@ const mongoose = require('mongoose');
  * Rules:
  *  - Score < 40%  → assign REMEDIAL DRILL (easier version, foundational)
  *  - Score 40–70% → assign CONCEPT PRACTICE (same level)
- *  - Score > 70%  → assign NEXT CONCEPT (advance)
+ *  - Score 70–90% → assign NEXT CONCEPT (advance)
+ *  - Score >= 90% → assign ENRICHMENT CHALLENGE (harder version, higher order thinking)
  *
  * Generates per-concept recommendations from an attempt.
  */
@@ -76,7 +78,6 @@ const getTaskTitle = (type, conceptName) => {
  */
 const generateRecommendations = async (attempt, student) => {
   const recommendations = [];
-  const isValidConceptId = (conceptId) => mongoose.Types.ObjectId.isValid(conceptId);
 
   for (const cs of attempt.conceptScores) {
     const { concept, conceptName, percentage } = cs;
