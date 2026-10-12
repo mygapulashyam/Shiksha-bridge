@@ -10,6 +10,7 @@ const {
   syncClassTeacherLink,
   syncTeacherClassAssignments,
 } = require('../services/classAssignmentSyncService');
+const { escapeRegex } = require('../utils/validators');
 
 /* ═══════════════════════════════════════════
    SCHOOLS
@@ -21,8 +22,8 @@ const createSchool = asyncHandler(async (req, res) => {
 
 const getSchools = asyncHandler(async (req, res) => {
   const filter = {};
-  if (req.query.state) filter.state = new RegExp(req.query.state, 'i');
-  if (req.query.district) filter.district = new RegExp(req.query.district, 'i');
+  if (req.query.state) filter.state = new RegExp(escapeRegex(req.query.state.trim()), 'i');
+  if (req.query.district) filter.district = new RegExp(escapeRegex(req.query.district.trim()), 'i');
   if (req.query.type) filter.type = req.query.type;
 
   const result = await paginate(School, filter, { sort: { name: 1 } }, req);
@@ -48,7 +49,7 @@ const getUsers = asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.role) filter.role = req.query.role;
   if (req.query.school) filter.school = req.query.school;
-  if (req.query.search) filter.name = new RegExp(req.query.search, 'i');
+  if (req.query.search) filter.name = new RegExp(escapeRegex(req.query.search.trim()), 'i');
 
   const result = await paginate(
     User,
@@ -206,7 +207,7 @@ const getConcepts = asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.subject) filter.subject = req.query.subject;
   if (req.query.grade) filter.grade = parseInt(req.query.grade);
-  if (req.query.chapter) filter.chapter = new RegExp(req.query.chapter, 'i');
+  if (req.query.chapter) filter.chapter = new RegExp(escapeRegex(req.query.chapter.trim()), 'i');
 
   const concepts = await Concept.find(filter)
     .populate('subject', 'name icon color')
@@ -382,6 +383,8 @@ const deleteClass = asyncHandler(async (req, res) => {
   await User.updateMany({ class: cls._id }, { $unset: { class: 1 } });
   // Remove class from teachers' classes array
   await User.updateMany({ classes: cls._id }, { $pull: { classes: cls._id } });
+  // Remove class reference from quizzes
+  await Quiz.updateMany({ assignedClass: cls._id }, { $unset: { assignedClass: 1 } });
   // Delete the class
   await Class.findByIdAndDelete(cls._id);
 

@@ -4,7 +4,7 @@ import Layout from '../../components/common/Layout';
 import { PageLoader, Alert, SectionHeader, ProgressBar } from '../../components/common/UI';
 import api from '../../api/axios';
 
-const PRIORITY_COLORS = { high: 'var(--danger)', medium: 'var(--accent-dark)', low: 'var(--secondary)' };
+const PRIORITY_COLORS = { high: '#D63B3B', medium: '#B45309', low: '#1B7A4E' };
 const TYPE_ICONS = { remedial_drill: '🔧', concept_practice: '📖', next_concept: '🚀', revision: '🔁' };
 const BADGE_ICONS = { 'First Steps': '🎯', 'Perfect Score': '⭐', 'Week Warrior': '🔥', 'Month Master': '🏆' };
 

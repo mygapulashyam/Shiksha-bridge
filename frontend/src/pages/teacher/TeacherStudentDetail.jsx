@@ -25,7 +25,7 @@ export default function TeacherStudentDetail() {
   const chartData = [...attempts].reverse().map((a, i) => ({ attempt: i + 1, score: a.percentage, quiz: a.quiz?.title }));
   const avgScore = attempts.length ? Math.round(attempts.reduce((s, a) => s + a.percentage, 0) / attempts.length) : 0;
   const TYPE_ICONS = { remedial_drill: '🔧', concept_practice: '📖', next_concept: '🚀' };
-  const PRIORITY_COLORS = { high: 'var(--danger)', medium: 'var(--accent-dark)', low: 'var(--secondary)' };
+  const PRIORITY_COLORS = { high: '#D63B3B', medium: '#B45309', low: '#1B7A4E' };
 
   return (
     <Layout>

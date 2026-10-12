@@ -13,7 +13,7 @@ const questionSchema = new mongoose.Schema(
     options: [
       {
         label: { type: String }, // A, B, C, D
-        text: { type: String, required: true },
+        text: { type: String, default: '' },
         textHindi: { type: String },
         isCorrect: { type: Boolean, default: false },
       },
@@ -41,6 +41,18 @@ const questionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Clean up options before saving
+questionSchema.pre('save', function (next) {
+  if (this.type === 'fillblank') {
+    this.options = [];
+  } else if (this.type === 'mcq' || this.type === 'truefalse') {
+    if (Array.isArray(this.options)) {
+      this.options = this.options.filter(o => o && o.text && o.text.trim().length > 0);
+    }
+  }
+  next();
+});
+
 /* ─── Quiz ───────────────────────────────────── */
 const quizSchema = new mongoose.Schema(
   {
@@ -59,6 +71,7 @@ const quizSchema = new mongoose.Schema(
     class: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Class',
+      set: v => (v === '' || v === null ? undefined : v),
     },
     grade: { type: Number, min: 6, max: 10 },
     chapter: { type: String, trim: true },
@@ -79,7 +92,11 @@ const quizSchema = new mongoose.Schema(
     },
     // Assign to specific students or whole class
     assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    assignedClass: { type: mongoose.Schema.Types.ObjectId, ref: 'Class' },
+    assignedClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class',
+      set: v => (v === '' || v === null ? undefined : v),
+    },
     isPublished: { type: Boolean, default: false },
     publishedAt: { type: Date },
     dueDate: { type: Date },

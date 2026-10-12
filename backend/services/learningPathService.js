@@ -136,7 +136,8 @@ const buildLearningPath = async (student, attempt) => {
  */
 const advancePathStep = async (pathId, studentId) => {
   const path = await LearningPath.findOne({ _id: pathId, student: studentId });
-  if (!path || path.status === 'completed') return path;
+  if (!path) return { path: null, advanced: false };
+  if (path.status === 'completed') return { path, advanced: false };
 
   const current = path.steps[path.currentStep];
   if (current) {
@@ -158,7 +159,7 @@ const advancePathStep = async (pathId, studentId) => {
   );
 
   await path.save();
-  return path;
+  return { path, advanced: true, completedStep: current };
 };
 
 /**

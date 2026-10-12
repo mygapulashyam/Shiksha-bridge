@@ -18,9 +18,51 @@ const { isValidConceptId } = require('../utils/validators');
 /* ══════════════════════════════════════════════════
    QUIZZES
 ══════════════════════════════════════════════════ */
+const verifyStudentQuizAccess = async (student, quiz) => {
+  if (!quiz.isPublished || quiz.isActive === false) {
+    return { allowed: false, message: 'Quiz is not published or active' };
+  }
+
+  // Cross-school isolation
+  if (quiz.school && student.school && quiz.school.toString() !== student.school.toString()) {
+    return { allowed: false, message: 'You cannot access quizzes from another school' };
+  }
+
+  // 1. Directly assigned to student
+  if (quiz.assignedTo && quiz.assignedTo.length > 0) {
+    if (quiz.assignedTo.some(id => id.toString() === student._id.toString())) {
+      return { allowed: true };
+    }
+  }
+
+  // 2. Assigned to student's class
+  if (student.class && quiz.assignedClass) {
+    if (quiz.assignedClass.toString() === student.class.toString()) {
+      return { allowed: true };
+    }
+  }
+
+  // 3. Grade-level fallback (only within same school if school is set)
+  if (!quiz.assignedClass && (!quiz.assignedTo || quiz.assignedTo.length === 0)) {
+    if (student.class) {
+      const cls = await Class.findById(student.class).lean();
+      if (cls && quiz.grade === cls.grade) {
+        return { allowed: true };
+      }
+    }
+  }
+
+  return { allowed: false, message: 'This quiz is not assigned to you or your class' };
+};
+
 const getAvailableQuizzes = asyncHandler(async (req, res) => {
   const student = req.user;
   const filter = { isPublished: true, isActive: true };
+
+  // School isolation: students only see quizzes from their own school
+  if (student.school) {
+    filter.school = student.school;
+  }
 
   const orConditions = [{ assignedTo: student._id }];
 
@@ -49,19 +91,71 @@ const getAvailableQuizzes = asyncHandler(async (req, res) => {
 });
 
 const getQuizForAttempt = asyncHandler(async (req, res) => {
+  const student = req.user;
   const quiz = await Quiz.findOne({ _id: req.params.id, isPublished: true, isActive: true })
     .populate('subject', 'name icon color')
     .populate('concepts', 'name chapter')
-    .populate({ path: 'questions.question', select: '-correctAnswer', populate: { path: 'concept', select: 'name' } });
+    .populate({
+      path: 'questions.question',
+      select: '-correctAnswer -explanation -explanationHindi',
+      populate: { path: 'concept', select: 'name' }
+    });
+
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
 
-  const questionsShuffled = [...quiz.questions];
+  // Authorization check: verify school and class assignment
+  const access = await verifyStudentQuizAccess(student, quiz);
+  if (!access.allowed) {
+    return res.status(403).json({ success: false, message: access.message });
+  }
+
+  // Sanitize questions: strip isCorrect from each option to completely prevent answer leakage
+  const sanitizedQuestions = quiz.questions.map(qRef => {
+    const q = qRef.question;
+    if (!q) return null;
+    const sanitizedQuestion = {
+      _id: q._id,
+      text: q.text,
+      textHindi: q.textHindi,
+      type: q.type,
+      concept: q.concept,
+      difficulty: q.difficulty,
+      marks: q.marks || qRef.marks || 1,
+      options: (q.options || []).map(opt => ({
+        _id: opt._id,
+        label: opt.label,
+        text: opt.text,
+        textHindi: opt.textHindi,
+      })),
+    };
+    return {
+      _id: qRef._id,
+      question: sanitizedQuestion,
+      order: qRef.order,
+      marks: qRef.marks || 1,
+    };
+  }).filter(Boolean);
+
+  // Shuffle questions for attempt
+  const questionsShuffled = [...sanitizedQuestions];
   for (let i = questionsShuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [questionsShuffled[i], questionsShuffled[j]] = [questionsShuffled[j], questionsShuffled[i]];
   }
 
-  res.json({ success: true, data: { _id: quiz._id, title: quiz.title, description: quiz.description, type: quiz.type, subject: quiz.subject, duration: quiz.duration, totalMarks: quiz.totalMarks, questions: questionsShuffled } });
+  res.json({
+    success: true,
+    data: {
+      _id: quiz._id,
+      title: quiz.title,
+      description: quiz.description,
+      type: quiz.type,
+      subject: quiz.subject,
+      duration: quiz.duration,
+      totalMarks: quiz.totalMarks,
+      questions: questionsShuffled,
+    },
+  });
 });
 
 /* ══════════════════════════════════════════════════
@@ -73,19 +167,68 @@ const startAttempt = asyncHandler(async (req, res) => {
   const quiz = await Quiz.findById(quizId);
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
 
-  const existingAttempt = await Attempt.findOne({ student: student._id, quiz: quizId, status: 'in_progress' });
-  if (existingAttempt) {
-    return res.status(200).json({ success: true, data: { attemptId: existingAttempt._id, answers: existingAttempt.answers, timeTaken: existingAttempt.timeTaken } });
+  // Check student access
+  const access = await verifyStudentQuizAccess(student, quiz);
+  if (!access.allowed) {
+    return res.status(403).json({ success: false, message: access.message });
   }
 
+  const durationMinutes = quiz.duration || 20;
+  const now = new Date();
+
+  const existingAttempt = await Attempt.findOne({ student: student._id, quiz: quizId, status: 'in_progress' });
+  if (existingAttempt) {
+    const started = new Date(existingAttempt.startedAt || now);
+    const deadline = existingAttempt.deadline || new Date(started.getTime() + durationMinutes * 60 * 1000 + 30000);
+    if (!existingAttempt.deadline) {
+      existingAttempt.deadline = deadline;
+      await existingAttempt.save();
+    }
+    const remainingSeconds = Math.max(0, Math.round((deadline.getTime() - Date.now()) / 1000));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        attemptId: existingAttempt._id,
+        answers: existingAttempt.answers,
+        startedAt: existingAttempt.startedAt,
+        deadline,
+        duration: durationMinutes,
+        remainingSeconds,
+      },
+    });
+  }
+
+  const deadline = new Date(now.getTime() + durationMinutes * 60 * 1000 + 30000);
   const prevAttempts = await Attempt.countDocuments({ student: student._id, quiz: quizId });
-  const attempt = await Attempt.create({ student: student._id, quiz: quizId, school: student.school, class: student.class, subject: quiz.subject, totalMarks: quiz.totalMarks, status: 'in_progress', attemptNumber: prevAttempts + 1 });
-  res.status(201).json({ success: true, data: { attemptId: attempt._id } });
+  const attempt = await Attempt.create({
+    student: student._id,
+    quiz: quizId,
+    school: student.school,
+    class: student.class,
+    subject: quiz.subject,
+    totalMarks: quiz.totalMarks,
+    status: 'in_progress',
+    startedAt: now,
+    deadline,
+    attemptNumber: prevAttempts + 1,
+  });
+
+  res.status(201).json({
+    success: true,
+    data: {
+      attemptId: attempt._id,
+      startedAt: attempt.startedAt,
+      deadline,
+      duration: durationMinutes,
+      remainingSeconds: durationMinutes * 60,
+    },
+  });
 });
 
 const saveAnswers = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { answers = [], timeTaken } = req.body;
+  const { answers = [] } = req.body;
   const attempt = await Attempt.findById(id);
   if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
   if (attempt.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorised' });
@@ -97,9 +240,11 @@ const saveAnswers = asyncHandler(async (req, res) => {
     enteredAnswer: a.enteredAnswer,
     timeTaken: a.timeTaken,
   }));
-  if (timeTaken !== undefined) {
-    attempt.timeTaken = timeTaken;
-  }
+
+  // Enforce server-side time calculation
+  const elapsedSeconds = Math.max(1, Math.round((Date.now() - new Date(attempt.startedAt).getTime()) / 1000));
+  attempt.timeTaken = elapsedSeconds;
+
   await attempt.save();
   res.json({ success: true, message: 'Answers saved' });
 });
@@ -134,33 +279,11 @@ const submitAttempt = asyncHandler(async (req, res) => {
   for (const qRef of quiz.questions) {
     const question = qRef.question;
     if (!question) continue;
-    const studentAnswer = answers.find(a => a.questionId === question._id.toString());
+    const studentAnswer = answers.find(a => (a.questionId || a.question?.toString()) === question._id.toString());
     const conceptId = question.concept?._id?.toString();
     const conceptName = question.concept?.name || 'Unknown';
     const marks = qRef.marks || 1;
-    if (!isValidConceptId(conceptId)) {
-      let isCorrect = false;
-      let selectedOption = null, enteredAnswer = null;
-      if (studentAnswer) {
-        selectedOption = studentAnswer.selectedOption;
-        enteredAnswer = studentAnswer.enteredAnswer;
-        if (question.type === 'mcq' || question.type === 'truefalse') {
-          const correct = question.options.find(o => o.isCorrect);
-          const studentSelectedOpt = question.options.find(o => o.label?.trim().toUpperCase() === selectedOption?.trim().toUpperCase());
-          isCorrect = correct && (
-            correct.label?.trim().toUpperCase() === selectedOption?.trim().toUpperCase() ||
-            (studentSelectedOpt && correct.text?.trim().toLowerCase() === studentSelectedOpt.text?.trim().toLowerCase())
-          );
-        } else if (question.type === 'fillblank') {
-          isCorrect = question.correctAnswer?.toLowerCase().trim() === enteredAnswer?.toLowerCase().trim();
-        }
-      }
-      if (isCorrect) marksObtained += marks;
-      gradedAnswers.push({ question: question._id, selectedOption, enteredAnswer, isCorrect, marksAwarded: isCorrect ? marks : 0, timeTaken: studentAnswer?.timeTaken, concept: null });
-      continue;
-    }
-    if (!conceptMap[conceptId]) conceptMap[conceptId] = { correct: 0, total: 0, name: conceptName };
-    conceptMap[conceptId].total += 1;
+
     let isCorrect = false;
     let selectedOption = null, enteredAnswer = null;
     if (studentAnswer) {
@@ -169,22 +292,55 @@ const submitAttempt = asyncHandler(async (req, res) => {
       if (question.type === 'mcq' || question.type === 'truefalse') {
         const correct = question.options.find(o => o.isCorrect);
         const studentSelectedOpt = question.options.find(o => o.label?.trim().toUpperCase() === selectedOption?.trim().toUpperCase());
-        isCorrect = correct && (
+        isCorrect = !!(correct && (
           correct.label?.trim().toUpperCase() === selectedOption?.trim().toUpperCase() ||
           (studentSelectedOpt && correct.text?.trim().toLowerCase() === studentSelectedOpt.text?.trim().toLowerCase())
-        );
+        ));
       } else if (question.type === 'fillblank') {
         isCorrect = question.correctAnswer?.toLowerCase().trim() === enteredAnswer?.toLowerCase().trim();
       }
     }
-    if (isCorrect) { marksObtained += marks; conceptMap[conceptId].correct += 1; }
-    gradedAnswers.push({ question: question._id, selectedOption, enteredAnswer, isCorrect, marksAwarded: isCorrect ? marks : 0, timeTaken: studentAnswer?.timeTaken, concept: question.concept?._id });
+
+    if (isCorrect) marksObtained += marks;
+
+    if (isValidConceptId(conceptId)) {
+      if (!conceptMap[conceptId]) conceptMap[conceptId] = { correct: 0, total: 0, name: conceptName };
+      conceptMap[conceptId].total += 1;
+      if (isCorrect) conceptMap[conceptId].correct += 1;
+    }
+
+    // Snapshot question fields to preserve history if question is edited or deleted
+    gradedAnswers.push({
+      question: question._id,
+      questionText: question.text,
+      questionType: question.type,
+      options: question.options?.map(o => ({ label: o.label, text: o.text, isCorrect: o.isCorrect })),
+      explanation: question.explanation,
+      selectedOption,
+      enteredAnswer,
+      isCorrect,
+      marksAwarded: isCorrect ? marks : 0,
+      timeTaken: studentAnswer?.timeTaken,
+      concept: isValidConceptId(conceptId) ? question.concept?._id : null,
+    });
   }
 
   const conceptScores = Object.entries(conceptMap).map(([conceptId, data]) => {
     const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
-    return { concept: conceptId, conceptName: data.name, totalQuestions: data.total, correctAnswers: data.correct, percentage: pct, mastery: pct < 40 ? 'weak' : pct < 70 ? 'developing' : pct < 90 ? 'proficient' : 'mastered' };
+    return {
+      concept: conceptId,
+      conceptName: data.name,
+      totalQuestions: data.total,
+      correctAnswers: data.correct,
+      percentage: pct,
+      mastery: pct < 40 ? 'weak' : pct < 70 ? 'developing' : pct < 90 ? 'proficient' : 'mastered',
+    };
   });
+
+  // Server-enforced timeTaken calculation
+  const calculatedSeconds = Math.max(1, Math.round((Date.now() - new Date(attempt.startedAt).getTime()) / 1000));
+  const maxAllowedDuration = (quiz.duration || 20) * 60 + 120;
+  const enforcedTimeTaken = Math.min(calculatedSeconds, maxAllowedDuration);
 
   attempt.answers = gradedAnswers;
   attempt.marksObtained = marksObtained;
@@ -192,45 +348,71 @@ const submitAttempt = asyncHandler(async (req, res) => {
   attempt.conceptScores = conceptScores;
   attempt.status = 'completed';
   attempt.completedAt = new Date();
-  attempt.timeTaken = req.body.timeTaken;
+  attempt.timeTaken = enforcedTimeTaken;
   await attempt.save();
 
-  // Update student
+  // Update student (check retake XP exploit: only first completed attempt awards quiz XP)
   const student = await User.findById(req.user._id);
   student.updateStreak();
-  student.addXP(Math.round(attempt.percentage / 5));
+
+  const previousCompletedAttempts = await Attempt.countDocuments({
+    student: student._id,
+    quiz: quiz._id,
+    status: 'completed',
+    _id: { $ne: attempt._id },
+  });
+
+  if (previousCompletedAttempts === 0) {
+    // Only award XP on the first completed attempt
+    student.addXP(Math.round(attempt.percentage / 5));
+  }
+
   const newBadges = checkAndAwardBadges(student, attempt);
   newBadges.forEach(b => student.badges.push(b));
   await student.save({ validateBeforeSave: false });
 
-  // Fire async services - don't block response
-  const afterSubmit = async () => {
-    try {
-      await generateRecommendations(attempt, student);
-      await buildLearningPath(student, attempt);
-      await checkAndGenerateAlerts(attempt, student);
-      await updateProgressReport(student._id, attempt, quiz);
-    } catch(e) { console.error('Post-submit service error:', e.message); }
-  };
-  afterSubmit();
+  // Await post-submit services before sending response so serverless (Vercel) doesn't terminate early
+  await Promise.allSettled([
+    generateRecommendations(attempt, student),
+    buildLearningPath(student, attempt),
+    checkAndGenerateAlerts(attempt, student),
+    updateProgressReport(student._id, attempt, quiz),
+  ]);
 
-  // AI Learning Gap Analysis (fast - include in response)
+  // AI Learning Gap Analysis with safe timeout (non-blocking fallback)
   let aiAnalysis = null;
   try {
-    aiAnalysis = await analyzeLearningGaps({
+    const subjectDoc = await Subject.findById(attempt.subject).select('name').lean();
+    const aiPromise = analyzeLearningGaps({
       studentName: student.name,
       quizTitle: quiz.title,
       percentage: attempt.percentage,
       conceptScores,
-      subject: (await Subject.findById(attempt.subject).select('name').lean())?.name || 'Subject',
+      subject: subjectDoc?.name || 'Subject',
       grade: quiz.grade,
     });
-  } catch(e) { /* non-blocking */ }
+    // Timeout after 3.5 seconds to ensure fast UI response
+    aiAnalysis = await Promise.race([
+      aiPromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 3500)),
+    ]);
+  } catch (e) {
+    /* non-blocking */
+  }
 
   res.json({
     success: true,
     message: 'Quiz submitted successfully',
-    data: { attemptId: attempt._id, percentage: attempt.percentage, marksObtained, totalMarks: quiz.totalMarks, conceptScores, newBadges, streakUpdated: true, aiAnalysis },
+    data: {
+      attemptId: attempt._id,
+      percentage: attempt.percentage,
+      marksObtained,
+      totalMarks: quiz.totalMarks,
+      conceptScores,
+      newBadges,
+      streakUpdated: true,
+      aiAnalysis,
+    },
   });
 });
 
@@ -257,6 +439,16 @@ const getDashboard = asyncHandler(async (req, res) => {
   const student = await User.findById(req.user._id).populate('class', 'name grade section').populate('school', 'name');
 
   const quizFilter = { isPublished: true, isActive: true };
+  if (student.school) {
+    quizFilter.school = student.school;
+  }
+
+  // Filter out quizzes the student has already completed so they don't appear as pending
+  const completedQuizIds = await Attempt.find({ student: student._id, status: 'completed' }).distinct('quiz');
+  if (completedQuizIds.length > 0) {
+    quizFilter._id = { $nin: completedQuizIds };
+  }
+
   const orConditions = [{ assignedTo: student._id }];
   if (student.class) {
     orConditions.push({ assignedClass: student.class?._id || student.class });
@@ -283,10 +475,22 @@ const getDashboard = asyncHandler(async (req, res) => {
   const totalAttempts = await Attempt.countDocuments({ student: student._id, status: 'completed' });
   const avgScoreAgg = await Attempt.aggregate([{ $match: { student: student._id, status: 'completed' } }, { $group: { _id: null, avg: { $avg: '$percentage' } } }]);
 
+  const effectiveStreak = typeof student.getEffectiveStreak === 'function' ? student.getEffectiveStreak() : student.streak;
+
   res.json({
     success: true,
     data: {
-      student: { name: student.name, class: student.class, school: student.school, streak: student.streak, totalPoints: student.totalPoints, xp: student.xp, level: student.level, badges: student.badges, language: student.language },
+      student: {
+        name: student.name,
+        class: student.class,
+        school: student.school,
+        streak: effectiveStreak,
+        totalPoints: student.totalPoints,
+        xp: student.xp,
+        level: student.level,
+        badges: student.badges,
+        language: student.language,
+      },
       stats: { totalAttempts, avgScore: avgScoreAgg[0] ? Math.round(avgScoreAgg[0].avg) : 0, pendingTasks: pendingRecommendations.length },
       recentAttempts,
       recommendations: pendingRecommendations,
@@ -328,8 +532,18 @@ const updateRecommendationStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   const rec = await Recommendation.findOne({ _id: req.params.id, student: req.user._id });
   if (!rec) return res.status(404).json({ success: false, message: 'Not found' });
+
+  // Only award XP once when transitioning to completed
+  if (rec.status !== 'completed' && status === 'completed') {
+    rec.completedAt = new Date();
+    const studentUser = await User.findById(req.user._id);
+    if (studentUser) {
+      studentUser.addXP(15);
+      await studentUser.save({ validateBeforeSave: false });
+    }
+  }
+
   rec.status = status;
-  if (status === 'completed') { rec.completedAt = new Date(); await User.findByIdAndUpdate(req.user._id, { $inc: { xp: 15, totalPoints: 15 } }); }
   await rec.save();
   res.json({ success: true, data: rec });
 });
@@ -343,11 +557,18 @@ const getLearningPaths = asyncHandler(async (req, res) => {
 });
 
 const advanceLearningPath = asyncHandler(async (req, res) => {
-  const path = await advancePathStep(req.params.id, req.user._id);
+  const { path, advanced, completedStep } = await advancePathStep(req.params.id, req.user._id);
   if (!path) return res.status(404).json({ success: false, message: 'Path not found' });
-  // Award XP for completing step
-  const completedStep = path.steps[Math.max(0, path.currentStep - 1)];
-  if (completedStep) await User.findByIdAndUpdate(req.user._id, { $inc: { xp: completedStep.xpReward || 20, totalPoints: completedStep.xpReward || 20 } });
+
+  // Only award XP if the step was actually advanced
+  if (advanced && completedStep) {
+    const studentUser = await User.findById(req.user._id);
+    if (studentUser) {
+      studentUser.addXP(completedStep.xpReward || 20);
+      await studentUser.save({ validateBeforeSave: false });
+    }
+  }
+
   res.json({ success: true, data: path });
 });
 
@@ -384,7 +605,11 @@ const downloadParentReport = asyncHandler(async (req, res) => {
   const studentId = req.user.role === 'student' ? req.user._id : req.params.studentId;
   const [student, reports, recentAttempts] = await Promise.all([
     User.findById(studentId).populate('class', 'name grade section').populate('school', 'name district'),
-    ProgressReport.find({ student: studentId }).populate('subject', 'name icon').populate('conceptMastery.concept', 'name'),
+    ProgressReport.find({ student: studentId })
+      .populate('subject', 'name icon')
+      .populate('conceptMastery.concept', 'name')
+      .populate('weakConcepts', 'name chapter')
+      .populate('strongConcepts', 'name chapter'),
     Attempt.find({ student: studentId, status: 'completed' }).sort({ createdAt: -1 }).limit(8).populate('quiz', 'title').populate('subject', 'name icon'),
   ]);
   if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
@@ -396,18 +621,36 @@ const downloadParentReport = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Not authorised' });
   }
 
-  // AI or rule-based summary
-  const mainReport = reports[0];
-  const weakConcepts = mainReport?.weakConcepts?.map(c => c.name || c.conceptName) || [];
-  const strongConcepts = mainReport?.strongConcepts?.map(c => c.name || c.conceptName) || [];
+  // Aggregate weak and strong concepts across ALL reports
+  const allWeak = [];
+  const allStrong = [];
+  let totalAvg = 0;
+  let totalAttemptsCount = 0;
+
+  reports.forEach(r => {
+    (r.weakConcepts || []).forEach(c => {
+      const name = c.name || c.conceptName;
+      if (name && !allWeak.includes(name)) allWeak.push(name);
+    });
+    (r.strongConcepts || []).forEach(c => {
+      const name = c.name || c.conceptName;
+      if (name && !allStrong.includes(name)) allStrong.push(name);
+    });
+    totalAvg += (r.avgScore || 0);
+    totalAttemptsCount += (r.totalAttempts || 0);
+  });
+
+  const overallAvg = reports.length > 0 ? Math.round(totalAvg / reports.length) : 0;
+  const subjectNames = reports.map(r => r.subject?.name).filter(Boolean).join(', ') || 'all subjects';
+
   const aiResult = await generateParentReportSummary({
     studentName: student.name,
-    avgScore: mainReport?.avgScore || 0,
-    weakConcepts,
-    strongConcepts,
-    totalAttempts: mainReport?.totalAttempts || 0,
-    improvement: mainReport?.improvement || 0,
-    subject: mainReport?.subject?.name || 'all subjects',
+    avgScore: overallAvg,
+    weakConcepts: allWeak,
+    strongConcepts: allStrong,
+    totalAttempts: totalAttemptsCount,
+    improvement: reports[0]?.improvement || 0,
+    subject: subjectNames,
   });
 
   const pdfBuffer = await generateParentReport({

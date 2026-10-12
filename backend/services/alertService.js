@@ -5,6 +5,8 @@ const { Class } = require('../models/ClassSubjectConcept');
 const mongoose = require('mongoose');
 const { isValidConceptId } = require('../utils/validators');
 
+const { Quiz } = require('../models/QuizQuestion');
+
 /**
  * ─── Feature 3: Teacher Intervention Alerts ──────────────────────────────────
  * Called after each quiz submission and by a scheduled check (or on-demand)
@@ -12,7 +14,7 @@ const { isValidConceptId } = require('../utils/validators');
 
 /**
  * Check and generate alerts after a quiz attempt
- * @param {Object} attempt - populated attempt document
+ * @param {Object} attempt - attempt document
  * @param {Object} student - user document
  */
 const checkAndGenerateAlerts = async (attempt, student) => {
@@ -20,10 +22,19 @@ const checkAndGenerateAlerts = async (attempt, student) => {
     const teachers = await findTeachersForStudent(student);
     if (!teachers.length) return;
 
+    // Ensure quiz is populated with title
+    let quizTitle = attempt.quiz?.title;
+    if (!quizTitle && attempt.quiz) {
+      const qDoc = await Quiz.findById(attempt.quiz).select('title').lean();
+      quizTitle = qDoc?.title;
+    }
+
     for (const teacher of teachers) {
       await Promise.all([
-        checkLowScore(attempt, student, teacher),
+        checkLowScore(attempt, student, teacher, quizTitle),
         checkRepeatedFailure(attempt, student, teacher),
+        checkMasteryAchieved(attempt, student, teacher),
+        checkStreakBroken(student, teacher),
       ]);
     }
   } catch (err) {
@@ -36,18 +47,29 @@ const checkAndGenerateAlerts = async (attempt, student) => {
  */
 const runScheduledAlertChecks = async (schoolId) => {
   try {
-    await checkInactiveStudents(schoolId);
-    await checkClassAverageDrops(schoolId);
+    // If schoolId is not provided, run across all active schools
+    if (!schoolId) {
+      const School = require('../models/School');
+      const schools = await School.find({ isActive: true }).select('_id').lean();
+      for (const s of schools) {
+        await checkInactiveStudents(s._id);
+        await checkClassAverageDrops(s._id);
+      }
+    } else {
+      await checkInactiveStudents(schoolId);
+      await checkClassAverageDrops(schoolId);
+    }
   } catch (err) {
     console.error('Scheduled alert check error:', err.message);
   }
 };
 
 // ─── Alert Type: Low Score (<40%) ────────────────────────────────────────────
-const checkLowScore = async (attempt, student, teacher) => {
+const checkLowScore = async (attempt, student, teacher, quizTitle) => {
   if (attempt.percentage >= 40) return;
 
-  const dedupeKey = `low_score_${student._id}_${attempt._id}`;
+  const titleText = quizTitle || 'a quiz';
+  const dedupeKey = `low_score_${student._id}_${attempt._id}_${teacher._id}`;
   const exists = await Alert.findOne({ dedupeKey });
   if (exists) return;
 
@@ -59,7 +81,7 @@ const checkLowScore = async (attempt, student, teacher) => {
     subject: attempt.subject,
     type: 'low_score',
     priority: attempt.percentage < 25 ? 'high' : 'medium',
-    title: `⚠️ ${student.name} scored ${attempt.percentage}% on "${attempt.quiz?.title || 'a quiz'}"`,
+    title: `⚠️ ${student.name} scored ${attempt.percentage}% on "${titleText}"`,
     message: `${student.name} scored below 40% (${attempt.percentage}%) on this quiz. ` +
       `Weak areas: ${attempt.conceptScores?.filter(c => c.percentage < 40).map(c => c.conceptName).slice(0, 2).join(', ') || 'multiple concepts'}. ` +
       `Consider a 1-on-1 check-in or assigning targeted remedial drills.`,
@@ -71,24 +93,33 @@ const checkLowScore = async (attempt, student, teacher) => {
   });
 };
 
-// ─── Alert Type: Repeated Failure (3+ times on same concept) ─────────────────
+// ─── Alert Type: Repeated Failure (3+ times in a row on same concept) ────────
 const checkRepeatedFailure = async (attempt, student, teacher) => {
-
   for (const cs of (attempt.conceptScores || [])) {
     if (!isValidConceptId(cs.concept)) continue;
     if (cs.percentage >= 40) continue;
 
-    // Count how many times this student scored < 40% on this concept
-    const failCount = await Attempt.countDocuments({
+    // Check last 3 completed attempts that tested this concept
+    const recentAttempts = await Attempt.find({
       student: student._id,
       status: 'completed',
-      'conceptScores.concept': cs.concept,
-      'conceptScores.percentage': { $lt: 40 },
+      conceptScores: { $elemMatch: { concept: cs.concept } },
+    })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+
+    if (recentAttempts.length < 3) continue;
+
+    // Verify all 3 in a row scored < 40% on this concept
+    const allThreeFailed = recentAttempts.every(att => {
+      const match = (att.conceptScores || []).find(c => c.concept?.toString() === cs.concept.toString());
+      return match && match.percentage < 40;
     });
 
-    if (failCount < 3) continue;
+    if (!allThreeFailed) continue;
 
-    const dedupeKey = `repeated_failure_${student._id}_${cs.concept}_fail${failCount}`;
+    const dedupeKey = `repeated_failure_${student._id}_${cs.concept}_att${attempt._id}_${teacher._id}`;
     const exists = await Alert.findOne({ dedupeKey });
     if (exists) continue;
 
@@ -100,15 +131,68 @@ const checkRepeatedFailure = async (attempt, student, teacher) => {
       subject: attempt.subject,
       type: 'repeated_failure',
       priority: 'high',
-      title: `🔴 ${student.name} has failed "${cs.conceptName}" ${failCount} times`,
-      message: `${student.name} has scored below 40% on the concept "${cs.conceptName}" ${failCount} times in a row. ` +
+      title: `🔴 ${student.name} has failed "${cs.conceptName}" 3 times in a row`,
+      message: `${student.name} has scored below 40% on the concept "${cs.conceptName}" 3 times in a row. ` +
         `This persistent gap needs immediate intervention — consider a face-to-face session or alternative teaching approach.`,
       data: {
         score: cs.percentage,
         conceptName: cs.conceptName,
         conceptId: cs.concept,
-        attemptCount: failCount,
+        attemptCount: 3,
       },
+      dedupeKey,
+    });
+  }
+};
+
+// ─── Alert Type: Mastery Achieved (Positive notification) ────────────────────
+const checkMasteryAchieved = async (attempt, student, teacher) => {
+  for (const cs of (attempt.conceptScores || [])) {
+    if (!isValidConceptId(cs.concept)) continue;
+    if (cs.percentage < 90) continue;
+
+    const dedupeKey = `mastery_${student._id}_${cs.concept}_${teacher._id}`;
+    const exists = await Alert.findOne({ dedupeKey });
+    if (exists) continue;
+
+    await Alert.create({
+      teacher: teacher._id,
+      student: student._id,
+      school: student.school,
+      class: student.class,
+      subject: attempt.subject,
+      type: 'mastery_achieved',
+      priority: 'low',
+      title: `🌟 ${student.name} mastered "${cs.conceptName}"!`,
+      message: `${student.name} scored ${cs.percentage}% and demonstrated mastery in "${cs.conceptName}". Consider challenging them with advanced enrichment material.`,
+      data: {
+        score: cs.percentage,
+        conceptName: cs.conceptName,
+        conceptId: cs.concept,
+      },
+      dedupeKey,
+    });
+  }
+};
+
+// ─── Alert Type: Streak Broken ───────────────────────────────────────────────
+const checkStreakBroken = async (student, teacher) => {
+  // If student had a high streak (>= 7 days) and reset to 1
+  if (student.streak === 1 && student.previousStreak && student.previousStreak >= 7) {
+    const dedupeKey = `streak_broken_${student._id}_${Date.now().toString().slice(0, 6)}_${teacher._id}`;
+    const exists = await Alert.findOne({ dedupeKey });
+    if (exists) return;
+
+    await Alert.create({
+      teacher: teacher._id,
+      student: student._id,
+      school: student.school,
+      class: student.class,
+      type: 'streak_broken',
+      priority: 'medium',
+      title: `⚡ ${student.name}'s ${student.previousStreak}-day learning streak was broken`,
+      message: `${student.name} missed a day after maintaining an active ${student.previousStreak}-day daily learning streak. A word of encouragement could help them bounce back!`,
+      data: {},
       dedupeKey,
     });
   }
@@ -216,18 +300,27 @@ const checkClassAverageDrops = async (schoolId) => {
   }
 };
 
-// ─── Helper: Find teachers for a student ─────────────────────────────────────
+// ─── Helper: Find teachers for a student (specifically assigned teachers) ────
 const findTeachersForStudent = async (student) => {
-  if (!student.class && !student.school) return [];
-  return await User.find({
+  if (!student.class) return [];
+  // Find teachers specifically assigned to this student's class
+  const teachers = await User.find({
     role: 'teacher',
     school: student.school,
     isActive: true,
-    $or: [
-      { classes: student.class },
-      { school: student.school },
-    ],
+    classes: student.class,
   }).lean();
+
+  if (teachers.length > 0) return teachers;
+
+  // Fallback to class teacher if defined on Class model
+  const cls = await Class.findById(student.class).select('classTeacher').lean();
+  if (cls?.classTeacher) {
+    const classTeacher = await User.findById(cls.classTeacher).lean();
+    if (classTeacher) return [classTeacher];
+  }
+
+  return [];
 };
 
 module.exports = { checkAndGenerateAlerts, runScheduledAlertChecks };

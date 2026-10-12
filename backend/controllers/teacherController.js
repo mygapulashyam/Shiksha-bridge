@@ -9,6 +9,8 @@ const mongoose = require('mongoose');
 const { teacherHasClassAccess } = require('../services/classAssignmentSyncService');
 const { validateQuizForPublishing } = require('../services/quizValidatorService');
 
+const { isValidConceptId, escapeRegex } = require('../utils/validators');
+
 /* ═══════════════════════════════════════════
    QUIZ MANAGEMENT
 ═══════════════════════════════════════════ */
@@ -18,8 +20,37 @@ const createQuiz = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
+  const {
+    title,
+    description,
+    type,
+    subject,
+    class: classId,
+    assignedClass,
+    assignedTo,
+    grade,
+    chapter,
+    concepts,
+    duration,
+    difficulty,
+    dueDate,
+  } = req.body;
+
   const quiz = await Quiz.create({
-    ...req.body,
+    title,
+    description,
+    type: type || 'diagnostic',
+    subject,
+    class: (classId === '' || classId === null) ? undefined : classId,
+    assignedClass: (assignedClass === '' || assignedClass === null) ? undefined : assignedClass,
+    assignedTo: Array.isArray(assignedTo) ? assignedTo.filter(Boolean) : [],
+    grade,
+    chapter,
+    concepts: Array.isArray(concepts) ? concepts.filter(Boolean) : [],
+    duration: duration || 20,
+    difficulty: difficulty || 'mixed',
+    dueDate: dueDate || undefined,
+    isPublished: false,
     createdBy: req.user._id,
     school: req.user.school,
   });
@@ -73,10 +104,29 @@ const updateQuiz = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Not authorised' });
   }
 
-  const allowed = ['title', 'description', 'duration', 'totalMarks', 'isPublished', 'grade', 'subject', 'class', 'concepts', 'questions', 'isActive'];
+  // Allowlist includes assignedClass and type
+  const allowed = ['title', 'description', 'type', 'duration', 'totalMarks', 'grade', 'subject', 'class', 'assignedClass', 'concepts', 'questions', 'isActive', 'dueDate'];
   allowed.forEach(k => {
-    if (req.body[k] !== undefined) quiz[k] = req.body[k];
+    if (req.body[k] !== undefined) {
+      if ((k === 'class' || k === 'assignedClass') && req.body[k] === '') {
+        quiz[k] = undefined;
+      } else {
+        quiz[k] = req.body[k];
+      }
+    }
   });
+
+  // If client is attempting to publish via PUT, run validation
+  if (req.body.isPublished === true && !quiz.isPublished) {
+    const validation = await validateQuizForPublishing(req.params.id);
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, message: 'Quiz validation failed', errors: validation.errors });
+    }
+    quiz.isPublished = true;
+    quiz.publishedAt = new Date();
+  } else if (req.body.isPublished === false) {
+    quiz.isPublished = false;
+  }
 
   await quiz.save();
   res.json({ success: true, data: quiz });
@@ -117,22 +167,29 @@ const deleteQuiz = asyncHandler(async (req, res) => {
    QUESTION MANAGEMENT
 ═══════════════════════════════════════════ */
 const createQuestion = asyncHandler(async (req, res) => {
+  // Check quiz ownership if quizId is provided
+  let targetQuiz = null;
+  if (req.body.quizId) {
+    targetQuiz = await Quiz.findById(req.body.quizId);
+    if (!targetQuiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
+    if (targetQuiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorised to modify another teacher\'s quiz' });
+    }
+  }
+
   const question = await Question.create({
     ...req.body,
     createdBy: req.user._id,
   });
 
   // If quizId provided, add to quiz
-  if (req.body.quizId) {
-    await Quiz.findByIdAndUpdate(req.body.quizId, {
-      $push: {
-        questions: {
-          question: question._id,
-          order: req.body.order || 0,
-          marks: question.marks || 1,
-        },
-      },
+  if (targetQuiz) {
+    targetQuiz.questions.push({
+      question: question._id,
+      order: req.body.order || targetQuiz.questions.length + 1,
+      marks: question.marks || 1,
     });
+    await targetQuiz.save();
   }
 
   res.status(201).json({ success: true, data: question });
@@ -144,18 +201,26 @@ const bulkCreateQuestions = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Provide an array of questions' });
   }
 
+  let targetQuiz = null;
+  if (quizId) {
+    targetQuiz = await Quiz.findById(quizId);
+    if (!targetQuiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
+    if (targetQuiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorised to modify another teacher\'s quiz' });
+    }
+  }
+
   const docs = questions.map((q) => ({ ...q, createdBy: req.user._id }));
   const created = await Question.insertMany(docs);
 
-  if (quizId) {
+  if (targetQuiz) {
     const questionRefs = created.map((q, i) => ({
       question: q._id,
-      order: i + 1,
+      order: targetQuiz.questions.length + i + 1,
       marks: q.marks || 1,
     }));
-    await Quiz.findByIdAndUpdate(quizId, {
-      $push: { questions: { $each: questionRefs } },
-    });
+    targetQuiz.questions.push(...questionRefs);
+    await targetQuiz.save();
   }
 
   res.status(201).json({ success: true, count: created.length, data: created });
@@ -257,14 +322,14 @@ const getClassPerformance = asyncHandler(async (req, res) => {
       streak: s.streak,
       totalPoints: s.totalPoints,
       badges: s.badges?.length || 0,
-      avgScore: stats.avgScore ? Math.round(stats.avgScore) : null,
+      avgScore: stats.avgScore !== undefined && stats.avgScore !== null ? Math.round(stats.avgScore) : null,
       totalAttempts: stats.totalAttempts || 0,
-      lastScore: stats.lastAttemptScore || null,
+      lastScore: stats.lastAttemptScore !== undefined && stats.lastAttemptScore !== null ? stats.lastAttemptScore : null,
       lastAttemptDate: stats.lastAttemptDate || null,
       status:
-        !stats.avgScore ? 'not_started'
-        : stats.avgScore < 40 ? 'weak'
-        : stats.avgScore < 70 ? 'developing'
+        (!stats.totalAttempts || stats.totalAttempts === 0) ? 'not_started'
+        : (stats.avgScore !== null && stats.avgScore !== undefined && stats.avgScore < 40) ? 'weak'
+        : (stats.avgScore !== null && stats.avgScore !== undefined && stats.avgScore < 70) ? 'developing'
         : 'proficient',
     };
   });
@@ -356,7 +421,7 @@ const getStudentDetail = asyncHandler(async (req, res) => {
 const getMyStudents = asyncHandler(async (req, res) => {
   const filter = { role: 'student', school: req.user.school, isActive: true };
   if (req.query.class) filter.class = req.query.class;
-  if (req.query.search) filter.name = new RegExp(req.query.search, 'i');
+  if (req.query.search) filter.name = new RegExp(escapeRegex(req.query.search.trim()), 'i');
 
   const result = await paginate(
     User,

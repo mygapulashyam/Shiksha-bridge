@@ -5,8 +5,13 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const u = localStorage.getItem('sb_user');
-    return u ? JSON.parse(u) : null;
+    try {
+      const u = localStorage.getItem('sb_user');
+      return u ? JSON.parse(u) : null;
+    } catch {
+      localStorage.removeItem('sb_user');
+      return null;
+    }
   });
   const [loading, setLoading] = useState(true);
 
@@ -36,11 +41,20 @@ export const AuthProvider = ({ children }) => {
     return data.data;
   };
 
-  const logout = () => {
-    localStorage.removeItem('sb_token');
-    localStorage.removeItem('sb_refresh_token');
-    localStorage.removeItem('sb_user');
-    setUser(null);
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('sb_refresh_token');
+    try {
+      if (refreshToken) {
+        await api.post('/auth/logout', { refreshToken });
+      }
+    } catch (err) {
+      // Continue client cleanup even if network request fails
+    } finally {
+      localStorage.removeItem('sb_token');
+      localStorage.removeItem('sb_refresh_token');
+      localStorage.removeItem('sb_user');
+      setUser(null);
+    }
   };
 
   const updateUser = (updates) => {

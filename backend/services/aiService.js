@@ -6,7 +6,7 @@ const client = new OpenAI({
   baseURL: 'https://integrate.api.nvidia.com/v1',
 });
 
-const NVIDIA_MODEL = 'meta/llama-3.1-8b-instruct';
+const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.1-70b-instruct';
 
 /**
  * ─── Feature 1: AI Learning Gap Analyzer ─────────────────────────────────────
@@ -173,14 +173,41 @@ Rules:
     const jsonStr = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(jsonStr);
 
-    // Attach conceptId to each question
-    const questions = (parsed.questions || []).map(q => ({
-      ...q,
-      concept: (conceptId === '' || conceptId === null) ? undefined : conceptId,
-      grade,
-    }));
+    // Validate and clean each generated question
+    const validQuestions = [];
+    for (const q of (parsed.questions || [])) {
+      if (!q.text?.trim()) continue;
+      if (!Array.isArray(q.options) || q.options.length < 2) continue;
 
-    return { questions, generatedBy: 'ai', model: NVIDIA_MODEL };
+      // Filter out options with empty text
+      const cleanOptions = q.options.filter(o => o.text && o.text.trim().length > 0);
+      if (cleanOptions.length < 2) continue;
+
+      const correctCount = cleanOptions.filter(o => o.isCorrect === true).length;
+      if (correctCount !== 1) {
+        // If none is marked correct, default first option to correct; if multiple, keep only the first
+        let foundFirst = false;
+        cleanOptions.forEach(o => {
+          if (correctCount === 0 && !foundFirst) {
+            o.isCorrect = true;
+            foundFirst = true;
+          } else if (o.isCorrect && !foundFirst) {
+            foundFirst = true;
+          } else {
+            o.isCorrect = false;
+          }
+        });
+      }
+
+      validQuestions.push({
+        ...q,
+        options: cleanOptions,
+        concept: (conceptId === '' || conceptId === null) ? undefined : conceptId,
+        grade,
+      });
+    }
+
+    return { questions: validQuestions, generatedBy: 'ai', model: NVIDIA_MODEL };
   } catch (err) {
     console.error('NVIDIA AI quiz generator error:', err.message);
     return { error: err.message, questions: [] };

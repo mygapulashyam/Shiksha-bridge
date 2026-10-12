@@ -30,6 +30,16 @@ const protect = async (req, res, next) => {
       });
     }
 
+    if (user.passwordChangedAt) {
+      const changedTimestamp = parseInt(user.passwordChangedAt.getTime() / 1000, 10);
+      if (decoded.iat && decoded.iat < changedTimestamp) {
+        return res.status(401).json({
+          success: false,
+          message: 'Password was recently changed. Please login again.',
+        });
+      }
+    }
+
     req.user = user;
     next();
   } catch (err) {

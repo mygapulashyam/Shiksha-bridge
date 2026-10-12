@@ -1,6 +1,12 @@
 const errorHandler = (err, req, res, next) => {
-  let statusCode = err.statusCode || 500;
+  let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'Internal Server Error';
+
+  // Body parser entity too large
+  if (err.type === 'entity.too.large' || err.statusCode === 413 || err.status === 413) {
+    statusCode = 413;
+    message = 'Request payload too large. Please reduce the size of the request.';
+  }
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
