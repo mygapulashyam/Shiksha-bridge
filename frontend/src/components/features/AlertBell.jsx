@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 
 const ALERT_ICONS = {
   low_score:        { icon: '⚠️', color: '#D63B3B', bg: '#FFEBEB' },
@@ -12,6 +13,7 @@ const ALERT_ICONS = {
 };
 
 export default function AlertBell() {
+  const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [open, setOpen] = useState(false);
@@ -21,8 +23,35 @@ export default function AlertBell() {
 
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 60000); // poll every minute
-    return () => clearInterval(interval);
+    let interval = null;
+
+    const startPolling = () => {
+      if (!interval) interval = setInterval(fetchUnreadCount, 60000);
+    };
+
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        fetchUnreadCount();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -119,7 +148,16 @@ export default function AlertBell() {
               {unreadCount > 0 && (
                 <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={markAllRead}>Mark all read</button>
               )}
-              <button className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem' }} onClick={() => { setOpen(false); navigate('/teacher/alerts'); }}>View all →</button>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '0.72rem' }}
+                onClick={() => {
+                  setOpen(false);
+                  navigate(user?.role === 'admin' ? '/admin' : '/teacher/alerts');
+                }}
+              >
+                View all →
+              </button>
             </div>
           </div>
 

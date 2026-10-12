@@ -1,6 +1,13 @@
 require('dotenv').config();
 
-const REQUIRED_ENV_VARS = ['JWT_SECRET', 'MONGO_URI'];
+// Safe defaults for required environment variables
+if (!process.env.JWT_EXPIRE) process.env.JWT_EXPIRE = '1h';
+if (!process.env.JWT_REFRESH_SECRET && process.env.JWT_SECRET) {
+  process.env.JWT_REFRESH_SECRET = process.env.JWT_SECRET + '_refresh';
+}
+if (!process.env.CORS_ORIGIN) process.env.CORS_ORIGIN = 'http://localhost:3000';
+
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'JWT_EXPIRE', 'CORS_ORIGIN', 'MONGO_URI'];
 for (const varName of REQUIRED_ENV_VARS) {
   if (!process.env[varName]) {
     console.error(`FATAL ERROR: Environment variable "${varName}" is missing.`);
@@ -25,6 +32,9 @@ const studentRoutes  = require('./routes/student');
 const featuresRoutes = require('./routes/features');
 
 const app = express();
+
+// Trust reverse proxy (Vercel, Heroku, Cloudflare) so per-user client IP rate limiting works accurately
+app.set('trust proxy', 1);
 
 // ── CORS must come FIRST so that even rate-limited (429) responses
 //    include the Access-Control-Allow-Origin header the browser needs.
@@ -69,7 +79,7 @@ const isDev = process.env.NODE_ENV === 'development';
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isDev ? 2000 : 300,          // Relaxed in dev to avoid false 429s
+  max: isDev ? 2000 : 300,
   standardHeaders: true,
   legacyHeaders: false,
   skipFailedRequests: false,
@@ -78,16 +88,25 @@ const limiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isDev ? 100 : 20,            // Relaxed in dev
+  max: isDev ? 100 : 20,
   message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' },
+});
+
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 50 : 15,
+  message: { success: false, message: 'Too many verification attempts. Please try again later.' },
 });
 
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', rateLimit({ windowMs: 60 * 60 * 1000, max: isDev ? 50 : 5 }));
+app.use('/api/auth/verify-otp', otpLimiter);
+app.use('/api/auth/reset-password', otpLimiter);
 
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: false }));
+// 10mb limit prevents 413s on 20-question AI quizzes or large content uploads
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 if (isDev) app.use(morgan('dev'));
 

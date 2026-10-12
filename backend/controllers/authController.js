@@ -8,14 +8,20 @@ const register = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
   const { name, email, password, role, school, class: classId, rollNumber, language, subjects, classes } = req.body;
-  if (await User.findOne({ email })) return res.status(400).json({ success: false, message: 'Email already registered' });
+  const normalizedEmail = email.toLowerCase().trim();
+  if (await User.findOne({ email: normalizedEmail })) return res.status(400).json({ success: false, message: 'Email already registered' });
+
+  const resolvedSchool = (school === '' || school === null) ? undefined : (school || req.user?.school);
+  if (role !== 'admin' && !resolvedSchool) {
+    return res.status(400).json({ success: false, message: 'School is required for teachers and students' });
+  }
 
   const payload = {
     name,
-    email,
+    email: normalizedEmail,
     password,
     role,
-    school: (school === '' || school === null) ? undefined : (school || req.user?.school),
+    school: resolvedSchool,
     class: (classId === '' || classId === null) ? undefined : classId,
     rollNumber,
     language: language || 'en',
@@ -46,11 +52,14 @@ const register = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message: 'User registered', data: { _id: user._id, name: user.name, email: user.email, role: user.role } });
 });
 
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
 const login = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
   const { email, password } = req.body;
-  const user = await User.findOne({ email }).select('+password +loginAttempts +lockUntil').populate('school', 'name district state');
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await User.findOne({ email: normalizedEmail }).select('+password +loginAttempts +lockUntil +refreshTokens').populate('school', 'name district state');
   if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
   if (user.isLocked) {
     const minsLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
@@ -67,12 +76,30 @@ const login = asyncHandler(async (req, res) => {
   await user.updateOne({ $set: { loginAttempts: 0 }, $unset: { lockUntil: 1 } });
   user.lastLogin = new Date();
   const token = user.getSignedJWT();
-  const refreshToken = user.getRefreshToken();
+  const rawRefreshToken = user.getRefreshToken();
+  const hashedRefreshToken = hashToken(rawRefreshToken);
   const tokens = (user.refreshTokens || []).slice(-4);
-  tokens.push({ token: refreshToken, createdAt: new Date() });
+  tokens.push({ token: hashedRefreshToken, createdAt: new Date() });
   user.refreshTokens = tokens;
   await user.save({ validateBeforeSave: false });
-  res.status(200).json({ success: true, token, refreshToken, data: { _id: user._id, name: user.name, email: user.email, role: user.role, school: user.school, class: user.class, language: user.language, streak: user.streak, totalPoints: user.totalPoints, xp: user.xp, level: user.level, badges: user.badges } });
+
+  // Sanitize user object sent to client (do not include refreshTokens)
+  const userData = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    school: user.school,
+    class: user.class,
+    language: user.language,
+    streak: typeof user.getEffectiveStreak === 'function' ? user.getEffectiveStreak() : user.streak,
+    totalPoints: user.totalPoints,
+    xp: user.xp,
+    level: user.level,
+    badges: user.badges,
+  };
+
+  res.status(200).json({ success: true, token, refreshToken: rawRefreshToken, data: userData });
 });
 
 const refreshTokenHandler = asyncHandler(async (req, res) => {
@@ -82,40 +109,59 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   let decoded;
   try { decoded = jwt.verify(rToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh'); }
   catch { return res.status(401).json({ success: false, message: 'Invalid refresh token' }); }
-  const user = await User.findById(decoded.id);
+  const user = await User.findById(decoded.id).select('+refreshTokens');
   if (!user || !user.isActive) return res.status(401).json({ success: false, message: 'User not found' });
-  if (!user.refreshTokens?.some(rt => rt.token === rToken)) return res.status(401).json({ success: false, message: 'Token revoked' });
+  const hashedInputToken = hashToken(rToken);
+  if (!user.refreshTokens?.some(rt => rt.token === hashedInputToken)) return res.status(401).json({ success: false, message: 'Token revoked' });
+
   const newToken = user.getSignedJWT();
   const newRefresh = user.getRefreshToken();
-  user.refreshTokens = (user.refreshTokens || []).filter(rt => rt.token !== rToken);
-  user.refreshTokens.push({ token: newRefresh, createdAt: new Date() });
+  const newHashedRefresh = hashToken(newRefresh);
+
+  user.refreshTokens = (user.refreshTokens || []).filter(rt => rt.token !== hashedInputToken);
+  user.refreshTokens.push({ token: newHashedRefresh, createdAt: new Date() });
   await user.save({ validateBeforeSave: false });
   res.json({ success: true, token: newToken, refreshToken: newRefresh });
 });
 
 const logout = asyncHandler(async (req, res) => {
   const { refreshToken: rToken } = req.body;
-  if (rToken && req.user) await User.findByIdAndUpdate(req.user._id, { $pull: { refreshTokens: { token: rToken } } });
+  if (rToken) {
+    const hashed = hashToken(rToken);
+    await User.updateMany({ 'refreshTokens.token': hashed }, { $pull: { refreshTokens: { token: hashed } } });
+  }
+  if (req.user) {
+    await User.findByIdAndUpdate(req.user._id, { $set: { refreshTokens: [] } });
+  }
   res.json({ success: true, message: 'Logged out' });
 });
 
 const getMe = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate('school', 'name district state type').populate('class', 'name grade section');
-  res.status(200).json({ success: true, data: user });
+  const user = await User.findById(req.user._id).select('-refreshTokens').populate('school', 'name district state type').populate('class', 'name grade section');
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  const userObj = user.toObject();
+  if (typeof user.getEffectiveStreak === 'function') {
+    userObj.streak = user.getEffectiveStreak();
+  }
+  delete userObj.refreshTokens;
+  res.status(200).json({ success: true, data: userObj });
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
   const allowed = ['name', 'language', 'guardianName', 'guardianEmail', 'guardianPhone', 'voiceEnabled', 'offlineMode', 'dailyGoal'];
   const updates = {};
   allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
-  const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true });
-  res.status(200).json({ success: true, data: user });
+  const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true }).select('-refreshTokens').populate('school', 'name district state type').populate('class', 'name grade section');
+  const userObj = user ? user.toObject() : {};
+  delete userObj.refreshTokens;
+  res.status(200).json({ success: true, data: userObj });
 });
 
 const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ success: false, message: 'Both passwords required' });
-  const user = await User.findById(req.user._id).select('+password');
+  if (newPassword.length < 8) return res.status(400).json({ success: false, message: 'New password must be at least 8 characters' });
+  const user = await User.findById(req.user._id).select('+password +refreshTokens');
   if (!await user.matchPassword(currentPassword)) return res.status(401).json({ success: false, message: 'Current password incorrect' });
   user.password = newPassword;
   user.refreshTokens = [];
@@ -129,20 +175,18 @@ const forgotPassword = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email is required.' });
   }
 
-  const user = await User.findOne({ email: email.toLowerCase().trim() });
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await User.findOne({ email: normalizedEmail });
   
-  // Generic success message to prevent account enumeration attacks
   const successMsg = 'If a matching account exists, a secure 6-digit OTP has been sent to your email address.';
 
   if (!user) {
     return res.status(200).json({ success: true, message: successMsg });
   }
 
-  // Generate a cryptographically secure 6-digit numeric OTP
   const otp = crypto.randomInt(100000, 999999).toString();
-  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+  const hashedOtp = hashToken(otp);
 
-  // Store SHA-256 hashed OTP, expiry (10 mins), and reset attempts
   user.passwordResetToken = hashedOtp;
   user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
   user.passwordResetAttempts = 0;
@@ -158,7 +202,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
     console.error('Failed to send password reset OTP email:', err);
   }
 
-  // In development, log the OTP to the console for local debugging if SMTP is not configured
   if (process.env.NODE_ENV === 'development') {
     console.log(`[DEV MODE] OTP generated for ${user.email}: ${otp}`);
     return res.status(200).json({
@@ -176,58 +219,48 @@ const verifyOTP = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email and OTP are required.' });
   }
 
-  const user = await User.findOne({ email: email.toLowerCase().trim() })
-    .select('+passwordResetToken +passwordResetExpires +passwordResetAttempts');
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Atomic increment attempt counter on the active reset request to prevent race conditions
+  const user = await User.findOneAndUpdate(
+    {
+      email: normalizedEmail,
+      passwordResetToken: { $exists: true, $ne: null },
+      passwordResetExpires: { $gt: new Date() },
+    },
+    { $inc: { passwordResetAttempts: 1 } },
+    { new: true }
+  ).select('+passwordResetToken +passwordResetExpires +passwordResetAttempts');
 
   if (!user) {
-    return res.status(400).json({ success: false, message: 'Invalid email or reset request.' });
+    return res.status(400).json({ success: false, message: 'Invalid email or verification request expired. Please request a new OTP.' });
   }
 
-  // 1. Check if an active reset request exists
-  if (!user.passwordResetToken || !user.passwordResetExpires) {
-    return res.status(400).json({ success: false, message: 'No active password reset request found.' });
-  }
-
-  // 2. Check if the OTP has expired
-  if (user.passwordResetExpires < Date.now()) {
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
-    user.passwordResetAttempts = 0;
-    await user.save({ validateBeforeSave: false });
-    return res.status(400).json({ success: false, message: 'The verification code (OTP) has expired. Please request a new one.' });
-  }
-
-  // 3. Brute force lock check: limit attempts to 5
-  if (user.passwordResetAttempts >= 5) {
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
-    user.passwordResetAttempts = 0;
-    await user.save({ validateBeforeSave: false });
+  if (user.passwordResetAttempts > 5) {
+    await User.findByIdAndUpdate(user._id, {
+      $unset: { passwordResetToken: 1, passwordResetExpires: 1 },
+      $set: { passwordResetAttempts: 0 },
+    });
     return res.status(429).json({ success: false, message: 'Too many incorrect OTP attempts. The OTP has been invalidated. Please request a new OTP.' });
   }
 
-  // 4. Verify OTP using SHA-256
-  const hashedOtpInput = crypto.createHash('sha256').update(otp.trim()).digest('hex');
+  const hashedOtpInput = hashToken(otp.trim());
   if (user.passwordResetToken !== hashedOtpInput) {
-    user.passwordResetAttempts += 1;
-    await user.save({ validateBeforeSave: false });
-
-    const remaining = 5 - user.passwordResetAttempts;
-    if (remaining <= 0) {
-      user.passwordResetToken = undefined;
-      user.passwordResetExpires = undefined;
-      user.passwordResetAttempts = 0;
-      await user.save({ validateBeforeSave: false });
+    const remaining = Math.max(0, 5 - user.passwordResetAttempts);
+    if (remaining === 0) {
+      await User.findByIdAndUpdate(user._id, {
+        $unset: { passwordResetToken: 1, passwordResetExpires: 1 },
+        $set: { passwordResetAttempts: 0 },
+      });
       return res.status(400).json({ success: false, message: 'Too many incorrect attempts. Please request a new OTP.' });
     }
     return res.status(400).json({ success: false, message: `Incorrect verification code. ${remaining} attempt(s) remaining before block.` });
   }
 
-  // 5. Success! Generate a single-use cryptographically secure reset token
+  // Success! Generate single-use reset token
   const resetToken = crypto.randomBytes(32).toString('hex');
-  const hashedResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  const hashedResetToken = hashToken(resetToken);
 
-  // Save the hashed reset token to passwordResetToken with 5 min expiry
   user.passwordResetToken = hashedResetToken;
   user.passwordResetExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
   user.passwordResetAttempts = 0;
@@ -236,7 +269,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'OTP verified successfully. You may now reset your password.',
-    resetToken
+    resetToken,
   });
 });
 
@@ -245,29 +278,31 @@ const resetPassword = asyncHandler(async (req, res) => {
   if (!token || !newPassword) {
     return res.status(400).json({ success: false, message: 'Reset token and new password are required.' });
   }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long.' });
+  }
 
-  // Hash the incoming token to compare with the one in DB
-  const hashedToken = crypto.createHash('sha256').update(token.trim()).digest('hex');
+  const hashedToken = hashToken(token.trim());
 
-  // Find user with matching active token
   const user = await User.findOne({
     passwordResetToken: hashedToken,
-    passwordResetExpires: { $gt: Date.now() }
+    passwordResetExpires: { $gt: Date.now() },
   });
 
   if (!user) {
     return res.status(400).json({ success: false, message: 'Invalid or expired password reset token. Please verify your OTP again.' });
   }
 
-  // Successful reset! Update password and clear security tokens
   user.password = newPassword;
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
   user.passwordResetAttempts = 0;
-  
-  // Revoke all existing refresh tokens for security (forces logouts on all devices)
+  // Clear any existing account lock
+  user.loginAttempts = 0;
+  user.lockUntil = undefined;
+  // Revoke all existing refresh tokens
   user.refreshTokens = [];
-  
+
   await user.save();
 
   res.status(200).json({ success: true, message: 'Password has been reset successfully. Please sign in with your new password.' });

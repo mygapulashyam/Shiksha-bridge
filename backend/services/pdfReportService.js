@@ -31,6 +31,14 @@ const hexToRgb = (hex) => {
   return [r, g, b];
 };
 
+// Helper to strip unsupported emoji and non-ASCII symbols so standard Helvetica doesn't crash or render garbage
+const cleanText = (str) => {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .trim();
+};
+
 const generateParentReport = (reportData) => {
   return new Promise((resolve, reject) => {
     try {
@@ -56,7 +64,7 @@ const generateParentReport = (reportData) => {
 
       // ─── Header Banner ───────────────────────────────────────────────────
       doc.rect(0, 0, doc.page.width, 90).fill(COLORS.dark);
-      doc.fillColor(COLORS.accent).font('Helvetica-Bold').fontSize(22).text('🎓 ShikshaBridge', 50, 22);
+      doc.fillColor(COLORS.accent).font('Helvetica-Bold').fontSize(22).text('ShikshaBridge', 50, 22);
       doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text('Student Learning Progress Report', 50, 50);
       doc.fillColor(COLORS.accent).text(`Period: ${period}`, 50, 65);
 
@@ -68,11 +76,11 @@ const generateParentReport = (reportData) => {
       // ─── Student Info Card ───────────────────────────────────────────────
       const infoY = 105;
       doc.rect(50, infoY, W, 70).fill(COLORS.lightGray).stroke(COLORS.lightGray);
-      doc.fillColor(COLORS.dark).font('Helvetica-Bold').fontSize(14).text(student.name, 65, infoY + 12);
+      doc.fillColor(COLORS.dark).font('Helvetica-Bold').fontSize(14).text(cleanText(student.name), 65, infoY + 12);
       doc.font('Helvetica').fontSize(10).fillColor(COLORS.gray);
       const infoLine = [
         classInfo ? `Class ${classInfo.grade} – ${classInfo.section}` : '',
-        school?.name || '',
+        cleanText(school?.name) || '',
         student.rollNumber ? `Roll No: ${student.rollNumber}` : '',
         student.email || '',
       ].filter(Boolean).join('  ·  ');
@@ -80,25 +88,25 @@ const generateParentReport = (reportData) => {
 
       // Streak & Points badges
       doc.fillColor(COLORS.primary).font('Helvetica-Bold').fontSize(10);
-      doc.text(`🔥 ${student.streak || 0} day streak`, 65, infoY + 50);
-      doc.text(`⭐ ${student.totalPoints || 0} points`, 200, infoY + 50);
-      doc.text(`🏅 ${student.badges?.length || 0} badges`, 320, infoY + 50);
+      doc.text(`${student.streak || 0} day streak`, 65, infoY + 50);
+      doc.text(`${student.totalPoints || 0} points`, 200, infoY + 50);
+      doc.text(`${student.badges?.length || 0} badges`, 320, infoY + 50);
 
       doc.y = infoY + 90;
 
       // ─── Subject Performance Summary ──────────────────────────────────────
       if (reports.length > 0) {
-        sectionHeader(doc, '📚 Subject Performance', W);
+        sectionHeader(doc, 'Subject Performance', W);
 
         reports.forEach((r) => {
-          const subjectName = r.subject?.name || 'Subject';
+          const subjectName = cleanText(r.subject?.name) || 'Subject';
           const avg = r.avgScore || 0;
           const color = avg >= 70 ? COLORS.success : avg >= 40 ? COLORS.warning : COLORS.danger;
           const label = avg >= 70 ? 'Proficient' : avg >= 40 ? 'Developing' : 'Needs Support';
 
           if (doc.y > 700) doc.addPage();
 
-          doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.dark).text(`${r.subject?.icon || '📖'} ${subjectName}`, 50, doc.y + 4);
+          doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.dark).text(subjectName, 50, doc.y + 4);
 
           // Progress bar
           const barY = doc.y;
@@ -123,7 +131,7 @@ const generateParentReport = (reportData) => {
               const mColor = getMasteryColor(cm.mastery);
               doc.circle(cx, cy + 5, 4).fill(mColor);
               doc.fillColor(COLORS.dark).fontSize(8).text(
-                (cm.conceptName || '').slice(0, 18),
+                cleanText(cm.conceptName || '').slice(0, 18),
                 cx + 8, cy,
                 { width: 140 }
               );
@@ -137,29 +145,29 @@ const generateParentReport = (reportData) => {
       // ─── AI/Rule Summary ──────────────────────────────────────────────────
       if (aiSummary) {
         if (doc.y > 650) doc.addPage();
-        sectionHeader(doc, '🧠 Teacher / AI Assessment', W);
+        sectionHeader(doc, 'Teacher / AI Assessment', W);
         doc.rect(50, doc.y, W, 1).fill(COLORS.lightGray);
         doc.rect(50, doc.y + 2, 4, 60).fill(COLORS.primary);
         doc.font('Helvetica').fontSize(10).fillColor(COLORS.dark)
-          .text(aiSummary, 62, doc.y + 6, { width: W - 20, lineGap: 3 });
+          .text(cleanText(aiSummary), 62, doc.y + 6, { width: W - 20, lineGap: 3 });
         doc.moveDown(2);
       }
 
       // ─── Teacher Note ─────────────────────────────────────────────────────
       if (teacherNote) {
         if (doc.y > 650) doc.addPage();
-        sectionHeader(doc, '📝 Teacher\'s Note', W);
+        sectionHeader(doc, "Teacher's Note", W);
         doc.rect(50, doc.y, W, 1).fill(COLORS.lightGray);
         doc.rect(50, doc.y + 2, 4, 60).fill(COLORS.secondary);
         doc.font('Helvetica').fontSize(10).fillColor(COLORS.dark)
-          .text(teacherNote, 62, doc.y + 6, { width: W - 20, lineGap: 3 });
+          .text(cleanText(teacherNote), 62, doc.y + 6, { width: W - 20, lineGap: 3 });
         doc.moveDown(2);
       }
 
       // ─── Recent Activity Table ─────────────────────────────────────────────
       if (recentAttempts.length > 0) {
         if (doc.y > 620) doc.addPage();
-        sectionHeader(doc, '📊 Recent Quiz Attempts', W);
+        sectionHeader(doc, 'Recent Quiz Attempts', W);
 
         const tableHeaders = ['Quiz', 'Subject', 'Score', 'Date'];
         const colWidths = [220, 110, 70, 90];

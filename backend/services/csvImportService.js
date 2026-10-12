@@ -8,12 +8,29 @@ const { Class, Subject, Concept } = require('../models/ClassSubjectConcept');
  * Supports importing: schools | teachers | students | classes | subjects | concepts
  */
 
+const { escapeRegex } = require('../utils/validators');
+
+/**
+ * ─── Feature 12: CSV/Excel Bulk Import ───────────────────────────────────────
+ * Supports importing: schools | teachers | students | classes | subjects | concepts
+ */
+
 const parseCSV = (buffer) => {
   return parse(buffer, {
     columns: true,
     skip_empty_lines: true,
     trim: true,
-    cast: true,
+    cast: (value, context) => {
+      // Do NOT cast roll numbers, phones, codes or names to numbers; preserve leading zeros (e.g. "01")
+      if (['rollNumber', 'phone', 'guardianPhone', 'code', 'udiseCode'].includes(context.column)) {
+        return value;
+      }
+      if (context.column === 'grade' || context.column === 'chapterNumber' || context.column === 'order') {
+        const num = Number(value);
+        return isNaN(num) ? value : num;
+      }
+      return value;
+    },
   });
 };
 
@@ -73,14 +90,18 @@ const importUsers = async (buffer, role, adminSchoolId) => {
       // Resolve school
       let schoolId = adminSchoolId;
       if (r.schoolName) {
-        const school = await School.findOne({ name: new RegExp(r.schoolName.trim(), 'i') });
+        const school = await School.findOne({ name: new RegExp(escapeRegex(r.schoolName.trim()), 'i') });
         if (school) schoolId = school._id;
+      }
+
+      if (!schoolId) {
+        throw new Error(`School could not be determined. Please specify a valid schoolName.`);
       }
 
       // Resolve class for students
       let classId;
       if (role === 'student' && r.className) {
-        const cls = await Class.findOne({ name: new RegExp(r.className.trim(), 'i'), school: schoolId });
+        const cls = await Class.findOne({ name: new RegExp(escapeRegex(r.className.trim()), 'i'), school: schoolId });
         if (cls) classId = cls._id;
       }
 
@@ -91,12 +112,23 @@ const importUsers = async (buffer, role, adminSchoolId) => {
         role,
         school: schoolId,
         class: classId,
-        rollNumber: r.rollNumber,
+        rollNumber: r.rollNumber !== undefined ? String(r.rollNumber).trim() : undefined,
         language: r.language || 'en',
         guardianName: r.guardianName,
         guardianEmail: r.guardianEmail,
         guardianPhone: r.guardianPhone,
       });
+
+      // Update school total count
+      if (role === 'student') {
+        await School.findByIdAndUpdate(schoolId, { $inc: { totalStudents: 1 } });
+        if (classId) {
+          await Class.findByIdAndUpdate(classId, { $inc: { studentCount: 1 } });
+        }
+      } else if (role === 'teacher') {
+        await School.findByIdAndUpdate(schoolId, { $inc: { totalTeachers: 1 } });
+      }
+
       results.created++;
     } catch (err) {
       results.errors.push(`Row ${i + 2}: ${err.message}`);

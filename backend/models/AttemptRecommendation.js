@@ -19,6 +19,16 @@ const attemptSchema = new mongoose.Schema(
     answers: [
       {
         question: { type: mongoose.Schema.Types.ObjectId, ref: 'Question' },
+        questionText: { type: String },
+        questionType: { type: String },
+        options: [
+          {
+            label: { type: String },
+            text: { type: String },
+            isCorrect: { type: Boolean },
+          },
+        ],
+        explanation: { type: String },
         selectedOption: { type: String },
         enteredAnswer: { type: String },
         isCorrect: { type: Boolean },
@@ -53,6 +63,7 @@ const attemptSchema = new mongoose.Schema(
       default: 'in_progress',
     },
     startedAt: { type: Date, default: Date.now },
+    deadline: { type: Date },
     completedAt: { type: Date },
     timeTaken: { type: Number }, // seconds
     attemptNumber: { type: Number, default: 1 },

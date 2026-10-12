@@ -250,8 +250,10 @@ export const ConfirmDialog = ({
 );
 
 /* ── Score Circle ── */
-export const ScoreCircle = ({ score, total, size = 130 }) => {
-  const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+export const ScoreCircle = ({ score, total, percentage, size = 130 }) => {
+  const pct = percentage !== undefined
+    ? Math.round(percentage)
+    : (total > 0 ? Math.round((score / total) * 100) : 0);
   const color = pct >= 80 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--danger)';
   const borderColor = pct >= 80 ? 'var(--secondary-light)' : pct >= 60 ? 'var(--accent-light)' : 'var(--danger-light)';
   return (
@@ -269,9 +271,11 @@ export const ScoreCircle = ({ score, total, size = 130 }) => {
       <div className="score-percent" style={{ color, fontSize: Math.max(1.6, size / 65) + 'rem' }}>
         {pct}%
       </div>
-      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-400)', fontWeight: 600, marginTop: 2 }}>
-        {score}/{total}
-      </div>
+      {score !== undefined && total !== undefined && (
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-400)', fontWeight: 600, marginTop: 2 }}>
+          {score}/{total}
+        </div>
+      )}
     </div>
   );
 };
@@ -386,8 +390,9 @@ export const SearchInput = ({ value, onChange, placeholder = 'Search…', style 
 
 /* ── Pagination ── */
 export const Pagination = ({ pagination, onPageChange }) => {
-  if (!pagination || pagination.totalPages <= 1) return null;
-  const { page, totalPages } = pagination;
+  const totalPages = pagination?.totalPages || pagination?.pages || 0;
+  const page = pagination?.page || 1;
+  if (!pagination || totalPages <= 1) return null;
 
   return (
     <div

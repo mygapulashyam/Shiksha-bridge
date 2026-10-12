@@ -40,6 +40,10 @@ export default function StudentResult() {
   const conceptScores = result?.conceptScores || attempt?.conceptScores || [];
   const newBadges = result?.newBadges || [];
 
+  const marksObtained = result?.marksObtained ?? attempt?.marksObtained;
+  const totalMarks = result?.totalMarks ?? attempt?.totalMarks;
+  const aiAnalysis = result?.aiAnalysis || attempt?.aiAnalysis;
+
   const radarData = conceptScores.map(cs => ({
     subject: cs.conceptName?.slice(0, 16) || 'Concept',
     score: cs.percentage,
@@ -58,12 +62,25 @@ export default function StudentResult() {
         <p style={{ color: 'var(--gray-700)', marginTop: 8, maxWidth: 480, margin: '8px auto 0', lineHeight: 1.6 }}>
           {rule.advice}
         </p>
-        {result?.marksObtained !== undefined && (
+        {marksObtained !== undefined && totalMarks !== undefined && (
           <div style={{ marginTop: 16, fontSize: '0.9rem', color: 'var(--gray-600)' }}>
-            You scored <strong>{result.marksObtained}</strong> out of <strong>{result.totalMarks}</strong> marks
+            You scored <strong>{marksObtained}</strong> out of <strong>{totalMarks}</strong> marks
           </div>
         )}
       </div>
+
+      {/* AI Analysis / Learning Gap Assessment */}
+      {aiAnalysis && (
+        <div className="card mb-6" style={{ background: 'linear-gradient(135deg, #F0FDF4, #ECFDF5)', border: '1.5px solid var(--secondary-light)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: '1.25rem' }}>🤖</span>
+            <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--secondary-dark)' }}>AI Learning Assessment</h3>
+          </div>
+          <p style={{ fontSize: '0.9rem', color: 'var(--gray-800)', lineHeight: 1.6 }}>
+            {aiAnalysis.summary || aiAnalysis}
+          </p>
+        </div>
+      )}
 
       {/* New Badges */}
       {newBadges?.length > 0 && (
@@ -153,7 +170,7 @@ export default function StudentResult() {
                 <div key={i} style={{
                   padding: '16px',
                   borderRadius: 10,
-                  border: `2px solid ${ans.isCorrect ? 'var(--secondary)' : 'var(--danger)'}30`,
+                  border: `2px solid ${ans.isCorrect ? 'rgba(27,122,78,0.3)' : 'rgba(214,59,59,0.3)'}`,
                   background: ans.isCorrect ? 'var(--secondary-light)' : '#FFEBEB'
                 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10 }}>

@@ -238,18 +238,45 @@ const getClassHeatmap = asyncHandler(async (req, res) => {
   const students = await User.find({ class: classId, role: 'student', isActive: true }).select('_id name').lean();
   const studentIds = students.map(s => s._id);
 
+  // 1. Group by student and concept to get each student's latest performance on that concept
+  // 2. Then group by concept to get count of unique students per bucket and overall average
   const conceptAggregation = await Attempt.aggregate([
     { $match: { student: { $in: studentIds }, status: 'completed' } },
+    { $sort: { createdAt: -1 } },
     { $unwind: '$conceptScores' },
     {
       $group: {
-        _id: '$conceptScores.concept',
+        _id: { concept: '$conceptScores.concept', student: '$student' },
         conceptName: { $first: '$conceptScores.conceptName' },
-        avgScore: { $avg: '$conceptScores.percentage' },
-        weakCount: { $sum: { $cond: [{ $lt: ['$conceptScores.percentage', 40] }, 1, 0] } },
-        developingCount: { $sum: { $cond: [{ $and: [{ $gte: ['$conceptScores.percentage', 40] }, { $lt: ['$conceptScores.percentage', 70] }] }, 1, 0] } },
-        masteredCount: { $sum: { $cond: [{ $gte: ['$conceptScores.percentage', 70] }, 1, 0] } },
-        totalResponses: { $sum: 1 },
+        latestPercentage: { $first: '$conceptScores.percentage' },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.concept',
+        conceptName: { $first: '$conceptName' },
+        avgScore: { $avg: '$latestPercentage' },
+        weakCount: { $sum: { $cond: [{ $lt: ['$latestPercentage', 40] }, 1, 0] } },
+        developingCount: {
+          $sum: {
+            $cond: [
+              { $and: [{ $gte: ['$latestPercentage', 40] }, { $lt: ['$latestPercentage', 70] }] },
+              1,
+              0,
+            ],
+          },
+        },
+        proficientCount: {
+          $sum: {
+            $cond: [
+              { $and: [{ $gte: ['$latestPercentage', 70] }, { $lt: ['$latestPercentage', 90] }] },
+              1,
+              0,
+            ],
+          },
+        },
+        masteredCount: { $sum: { $cond: [{ $gte: ['$latestPercentage', 90] }, 1, 0] } },
+        distinctStudentsCount: { $sum: 1 },
       },
     },
     { $sort: { avgScore: 1 } },
@@ -267,7 +294,9 @@ const getClassHeatmap = asyncHandler(async (req, res) => {
     avgScore: Math.round(c.avgScore),
     weakCount: c.weakCount,
     developingCount: c.developingCount,
+    proficientCount: c.proficientCount,
     masteredCount: c.masteredCount,
+    assessedStudents: c.distinctStudentsCount,
     totalStudents: studentIds.length,
     color: c.avgScore < 40 ? '#D63B3B' : c.avgScore < 70 ? '#F5B820' : '#1B7A4E',
     subject: conceptMap[c._id?.toString()]?.subject,
@@ -341,13 +370,34 @@ const getResources = asyncHandler(async (req, res) => {
   if (req.query.concept) filter.concept = req.query.concept;
   if (req.query.type) filter.type = req.query.type;
   if (req.query.language) filter.language = req.query.language;
+
+  // Students must only see approved resources that belong to their school or are platform-wide (school is null/undefined)
+  if (req.user.role === 'student') {
+    filter.isApproved = true;
+    filter.$or = [{ school: req.user.school }, { school: null }, { school: { $exists: false } }];
+  } else if (req.query.isApproved !== undefined) {
+    filter.isApproved = req.query.isApproved === 'true';
+  }
+
+  // Teacher / admin query filter by school if supplied or restricted to their school
+  if (req.user.role === 'teacher') {
+    filter.$or = [{ school: req.user.school }, { school: null }, { school: { $exists: false } }];
+  }
+
   const result = await paginate(ContentResource, filter, { populate: { path: 'concept', select: 'name chapter' } }, req);
   res.json({ success: true, ...result });
 });
 
 const approveResource = asyncHandler(async (req, res) => {
   const resource = await ContentResource.findByIdAndUpdate(req.params.id, { isApproved: true }, { new: true });
+  if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
   res.json({ success: true, data: resource });
+});
+
+const rejectResource = asyncHandler(async (req, res) => {
+  const resource = await ContentResource.findByIdAndUpdate(req.params.id, { isApproved: false }, { new: true });
+  if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
+  res.json({ success: true, message: 'Resource rejected', data: resource });
 });
 
 /* ════════════════════════════════════════════════════
@@ -491,7 +541,7 @@ module.exports = {
   getAlerts, markAlertRead, dismissAlert, markAllAlertsRead, triggerScheduledAlerts,
   getStudentHeatmap, getClassHeatmap,
   getClassDoubts, answerDoubt,
-  createResource, getResources, approveResource,
+  createResource, getResources, approveResource, rejectResource,
   importCSV, getCSVTemplateDownload,
   getImprovementTracking,
   getDistrictRankings,
