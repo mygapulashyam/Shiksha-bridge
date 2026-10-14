@@ -44,5 +44,6 @@ const alertSchema = new mongoose.Schema(
 // TTL – auto-delete alerts older than 60 days
 alertSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 24 * 3600 });
 alertSchema.index({ teacher: 1, isRead: 1, createdAt: -1 });
+alertSchema.index({ school: 1, isDismissed: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Alert', alertSchema);

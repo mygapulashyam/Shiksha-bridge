@@ -747,6 +747,9 @@ const downloadParentReport = asyncHandler(async (req, res) => {
   if (req.user.role === 'teacher' && student.school?._id?.toString() !== req.user.school?.toString()) {
     return res.status(403).json({ success: false, message: 'Not authorised' });
   }
+  if (req.user.role === 'principal' && student.school?._id?.toString() !== req.user.school?.toString()) {
+    return res.status(403).json({ success: false, message: 'Not authorised' });
+  }
 
   // Aggregate weak and strong concepts across ALL reports
   const allWeak = [];

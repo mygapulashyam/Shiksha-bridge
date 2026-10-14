@@ -16,7 +16,7 @@ const BLANK_USER = {
   subjects: [],
   classes: [],
 };
-const ROLE_COLORS = { admin: 'badge-danger', teacher: 'badge-success', student: 'badge-info' };
+const ROLE_COLORS = { admin: 'badge-danger', principal: 'badge-warning', teacher: 'badge-success', student: 'badge-info' };
 
 // Inner Component for Grade-Categorized Selection
 function GradeClassSelector({ role, schoolId, selectedValue, onChange, allClasses }) {
@@ -334,6 +334,7 @@ export default function AdminUsers() {
             <select className="form-input form-select" style={{ width: 140 }} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}>
               <option value="">All Roles</option>
               <option value="admin">Admin</option>
+              <option value="principal">Principal</option>
               <option value="teacher">Teacher</option>
               <option value="student">Student</option>
             </select>
@@ -369,7 +370,7 @@ export default function AdminUsers() {
                   <tr key={u._id}>
                     <td>
                       <div className="flex items-center gap-2">
-                        <div className="avatar avatar-sm" style={{ background: u.role === 'teacher' ? 'var(--secondary)' : u.role === 'admin' ? 'var(--primary)' : 'var(--info)' }}>
+                        <div className="avatar avatar-sm" style={{ background: u.role === 'teacher' ? 'var(--secondary)' : u.role === 'admin' ? 'var(--primary)' : u.role === 'principal' ? 'var(--warning)' : 'var(--info)' }}>
                           {u.name?.slice(0, 2).toUpperCase()}
                         </div>
                         <span style={{ fontWeight: 600 }}>{u.name}</span>
@@ -432,19 +433,20 @@ export default function AdminUsers() {
             </div>
             <div className="form-group">
               <label className="form-label">Password *</label>
-              <input className="form-input" required type="password" value={form.password} onChange={F('password')} placeholder="Min. 6 characters" minLength={6} />
+              <input className="form-input" required type="password" value={form.password} onChange={F('password')} placeholder="Min. 8 characters" minLength={8} />
             </div>
             <div className="form-group">
               <label className="form-label">Role *</label>
               <select className="form-input form-select" value={form.role} onChange={F('role')}>
                 <option value="teacher">Teacher</option>
+                <option value="principal">Principal</option>
                 <option value="student">Student</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">School</label>
-              <select className="form-input form-select" value={form.school} onChange={F('school')}>
+              <label className="form-label">School {form.role !== 'admin' ? '*' : ''}</label>
+              <select className="form-input form-select" required={form.role !== 'admin'} value={form.school} onChange={F('school')}>
                 <option value="">Select School</option>
                 {schools.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
@@ -530,19 +532,20 @@ export default function AdminUsers() {
             </div>
             <div className="form-group">
               <label className="form-label">New Password (optional)</label>
-              <input className="form-input" type="password" value={editForm.password} onChange={EF('password')} placeholder="Leave blank to keep current password" minLength={6} />
+              <input className="form-input" type="password" value={editForm.password} onChange={EF('password')} placeholder="Leave blank to keep current password" minLength={8} />
             </div>
             <div className="form-group">
               <label className="form-label">Role *</label>
               <select className="form-input form-select" value={editForm.role} onChange={EF('role')}>
                 <option value="teacher">Teacher</option>
+                <option value="principal">Principal</option>
                 <option value="student">Student</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">School</label>
-              <select className="form-input form-select" value={editForm.school} onChange={EF('school')}>
+              <label className="form-label">School {editForm.role !== 'admin' ? '*' : ''}</label>
+              <select className="form-input form-select" required={editForm.role !== 'admin'} value={editForm.school} onChange={EF('school')}>
                 <option value="">Select School</option>
                 {schools.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>

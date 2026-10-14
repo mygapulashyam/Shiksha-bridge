@@ -11,6 +11,7 @@ A production-style MERN stack application built for India's government and low-f
 | Role      | Key Features |
 |-----------|-------------|
 | **Admin** | Manage schools, teachers, students · District/platform analytics · Subject & concept curriculum builder |
+| **Principal** | School-wide learning dashboard · Class, student, and teacher drilldowns · Roster and class management · Intervention visibility · Student reports |
 | **Teacher** | Create & publish quizzes · Class-wide performance view · Weak-concept heatmap · Per-student detail |
 | **Student** | Attempt quizzes with timer · Instant concept-wise results · Smart task recommendations · Badges & streaks |
 
@@ -28,7 +29,7 @@ shiksha-bridge/
 │   │   ├── role.js          # Role-based access
 │   │   └── errorHandler.js  # Centralized error handling + asyncHandler
 │   ├── models/
-│   │   ├── User.js          # User (Admin/Teacher/Student) with streak & badges
+│   │   ├── User.js          # User (Admin/Principal/Teacher/Student) with streak & badges
 │   │   ├── School.js        # School with UDISE code
 │   │   ├── ClassSubjectConcept.js  # Class, Subject, Concept schemas
 │   │   ├── QuizQuestion.js  # Quiz & Question schemas
@@ -36,11 +37,13 @@ shiksha-bridge/
 │   ├── controllers/
 │   │   ├── authController.js
 │   │   ├── adminController.js
+│   │   ├── principalController.js
 │   │   ├── teacherController.js
 │   │   └── studentController.js
 │   ├── routes/
 │   │   ├── auth.js
 │   │   ├── admin.js
+│   │   ├── principal.js
 │   │   ├── teacher.js
 │   │   └── student.js
 │   ├── services/
@@ -62,7 +65,6 @@ shiksha-bridge/
 │   │       └── student/     # Dashboard, Quizzes, Attempt, Result, Progress
 │   └── public/index.html
 │
-├── sample-data.json         # API-based data import guide (no seed.js)
 └── README.md
 ```
 
@@ -96,22 +98,23 @@ cp .env.example .env
 #   PORT=5000
 ```
 
-### 3. Create First Admin (One-Time)
+### 3. Seed Demo Data
 
-Open `mongosh` and run:
+From the `backend` directory, run:
 
-```js
-use shiksha_bridge
-db.users.insertOne({
-  name: "Platform Admin",
-  email: "admin@shiksha.edu",
-  password: "$2a$12$LIxNGVe7hN1U4gHrJmVvJuOfbSTsNiGdNYlhDSTWwSoSwcWS.v1h2",
-  // password = "Admin@123"
-  role: "admin",
-  isActive: true,
-  createdAt: new Date()
-})
+```bash
+npm run seed
 ```
+
+The seed is safe to rerun: it upserts the demo school, class, curriculum, quiz,
+and activity without deleting other records. Existing accounts with demo emails
+are reused without changing their passwords. The command refuses to run when
+`NODE_ENV=production`.
+
+The demo includes a principal account. Each school may have one active principal;
+an administrator provisions or replaces that account from **Admin → Users**.
+Principals see only their own school's learning data and can manage its teachers,
+students, class rosters, and class-teacher assignments.
 
 ### 4. Start Development Servers
 
@@ -132,10 +135,10 @@ Open **http://localhost:3000**
 | Role    | Email                      | Password     |
 |---------|----------------------------|--------------|
 | Admin   | admin@shiksha.edu          | Admin@123    |
+| Principal | headteacher@shiksha.edu   | Principal@123 |
 | Teacher | priya.sharma@shiksha.edu   | Teacher@123  |
 | Student | arjun.patil@shiksha.edu    | Student@123  |
-
-> **See `sample-data.json`** for the complete API workflow to populate demo data.
+| Student | meera.kulkarni@shiksha.edu | Student@123  |
 
 ---
 
@@ -159,7 +162,7 @@ Located in `backend/services/recommendationEngine.js`.
 
 - JWT authentication with expiry
 - bcrypt password hashing (12 rounds)
-- Role-based access control (admin/teacher/student)
+- Role-based access control (admin/principal/teacher/student)
 - express-mongo-sanitize (NoSQL injection prevention)
 - Helmet.js (HTTP security headers)
 - express-rate-limit (200 req/15 min; 20 login/15 min)
@@ -191,6 +194,23 @@ Located in `backend/services/recommendationEngine.js`.
 | POST/GET | /api/admin/concepts             |
 | POST/GET | /api/admin/classes              |
 | GET    | /api/admin/analytics              |
+
+### Principal
+All endpoints are authenticated and scoped to the principal's assigned school.
+
+| Method | Endpoint |
+|--------|----------|
+| GET    | /api/principal/dashboard |
+| GET/POST | /api/principal/classes |
+| GET    | /api/principal/classes/:id/performance |
+| PATCH  | /api/principal/classes/:id |
+| GET    | /api/principal/students |
+| GET    | /api/principal/students/:id |
+| GET    | /api/principal/teachers |
+| GET    | /api/principal/interventions |
+| POST   | /api/principal/users |
+| PATCH  | /api/principal/users/:id |
+| GET    | /api/features/report/student/:id/pdf |
 
 ### Teacher
 | Method | Endpoint                               |
@@ -277,7 +297,7 @@ npm run dev
 4. **Gamification** — streaks, points, and badges to motivate students
 5. **Multilingual architecture** — Hindi + regional language support built into every model
 6. **Production security** — rate limiting, sanitization, helmet, role guards
-7. **Zero seed files** — all data flows through protected Admin APIs
+7. **Repeatable demo seed** — quickly populate a development database for testing
 8. **India-first UX** — UDISE codes, state boards (CBSE/ICSE/State), Hindi text fields
 
 ---

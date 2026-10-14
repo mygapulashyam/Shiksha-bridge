@@ -17,6 +17,7 @@ import AdminImport      from './pages/admin/AdminImport';
 import AdminRankings    from './pages/admin/AdminRankings';
 import AdminClasses     from './pages/admin/AdminClasses';
 import AdminResources   from './pages/admin/AdminResources';
+import PrincipalDashboard from './pages/principal/PrincipalDashboard';
 
 // Teacher
 import TeacherDashboard    from './pages/teacher/TeacherDashboard';
@@ -75,6 +76,16 @@ export default function App() {
             <Route path="/admin/import"    element={<ProtectedRoute roles={['admin']}><AdminImport /></ProtectedRoute>} />
             <Route path="/admin/rankings"  element={<ProtectedRoute roles={['admin']}><AdminRankings /></ProtectedRoute>} />
             <Route path="/admin/resources" element={<ProtectedRoute roles={['admin']}><AdminResources /></ProtectedRoute>} />
+
+            {/* ── Principal ───────────────────────────────────── */}
+            <Route path="/principal"                    element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/classes"            element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/classes/:classId"   element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/students"           element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/students/:studentId" element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/teachers"           element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/interventions"      element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
+            <Route path="/principal/reports"            element={<ProtectedRoute roles={['principal']}><PrincipalDashboard /></ProtectedRoute>} />
 
             {/* ── Teacher ───────────────────────────────────── */}
             <Route path="/teacher"                     element={<ProtectedRoute roles={['teacher']}><TeacherDashboard /></ProtectedRoute>} />

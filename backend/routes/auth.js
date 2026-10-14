@@ -13,7 +13,7 @@ const registerValidation = [
   body('name').notEmpty().trim().isLength({ max: 100 }),
   body('email').isEmail().normalizeEmail({ gmail_remove_dots: false }),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-  body('role').isIn(['admin', 'teacher', 'student']),
+  body('role').isIn(['admin', 'principal', 'teacher', 'student']),
 ];
 
 // Optional auth for logout so expired access tokens don't prevent session cleanup
