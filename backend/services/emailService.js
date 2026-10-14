@@ -25,140 +25,96 @@ const createTransporter = () => {
  */
 const sendOTPEmail = async (toEmail, otp, name) => {
   const transporter = createTransporter();
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+  const recipientName = escapeHtml(name || 'there');
+  const safeOtp = escapeHtml(otp);
   
   const mailOptions = {
     from: `"${process.env.EMAIL_FROM_NAME || 'ShikshaBridge Security'}" <${process.env.EMAIL_FROM || 'noreply@shiksha.edu'}>`,
     to: toEmail,
-    subject: '🔒 Reset Your ShikshaBridge Password - Security Code',
+    subject: 'Your ShikshaBridge code is here ✨',
     text: `Hello ${name || 'User'},\n\nWe received a request to reset your password. Use the following 6-digit OTP (One-Time Password) to reset it:\n\n${otp}\n\nThis code is valid for 10 minutes only.\n\nFor your security, NEVER share this code with anyone. If you didn't request a password reset, you can safely ignore this email.\n\nBest regards,\nThe ShikshaBridge Team`,
     html: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ShikshaBridge Security Code</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f7f6f5;
-      margin: 0;
-      padding: 0;
-      color: #3d3830;
-      -webkit-font-smoothing: antialiased;
-    }
-    .email-container {
-      max-width: 580px;
-      margin: 30px auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 15px rgba(28,25,20,0.06);
-      border: 1px solid #e8e5e0;
-    }
-    .email-header {
-      background: linear-gradient(135deg, #1b7a4e 0%, #145c3a 100%);
-      padding: 30px;
-      text-align: center;
-    }
-    .email-header h1 {
-      color: #f5b820;
-      margin: 0;
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-    }
-    .email-body {
-      padding: 40px 35px;
-    }
-    .email-body h2 {
-      color: #1c1914;
-      font-size: 20px;
-      margin-top: 0;
-      margin-bottom: 16px;
-    }
-    .email-body p {
-      font-size: 15px;
-      line-height: 1.6;
-      color: #7a7268;
-      margin-top: 0;
-      margin-bottom: 24px;
-    }
-    .otp-container {
-      background-color: #fff3e8;
-      border: 2px dashed #e8650a;
-      border-radius: 12px;
-      padding: 20px 30px;
-      text-align: center;
-      margin: 30px 0;
-    }
-    .otp-code {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 38px;
-      font-weight: 800;
-      color: #e8650a;
-      letter-spacing: 8px;
-    }
-    .otp-expiry {
-      font-size: 12px;
-      color: #c4530a;
-      margin-top: 8px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .security-notice {
-      background-color: #fafaf9;
-      border-left: 4px solid #f5b820;
-      padding: 16px 20px;
-      border-radius: 6px;
-      margin-bottom: 30px;
-    }
-    .security-notice p {
-      font-size: 13px;
-      color: #7a7268;
-      margin: 0;
-      line-height: 1.5;
-    }
-    .email-footer {
-      background-color: #fafaf9;
-      padding: 24px 35px;
-      border-top: 1px solid #e8e5e0;
-      text-align: center;
-      font-size: 12px;
-      color: #9e9688;
-    }
-    .email-footer a {
-      color: #e8650a;
-      text-decoration: none;
-      font-weight: 600;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your ShikshaBridge password reset code</title>
 </head>
-<body>
-  <div class="email-container">
-    <div class="email-header">
-      <h1>🎓 ShikshaBridge</h1>
-    </div>
-    <div class="email-body">
-      <h2>Hello, ${name || 'User'} 👋</h2>
-      <p>We received a request to reset the password for your ShikshaBridge account. Please use the secure, one-time verification code (OTP) below to complete your reset process:</p>
-      
-      <div class="otp-container">
-        <div class="otp-code">${otp}</div>
-        <div class="otp-expiry">Valid for 10 minutes only</div>
-      </div>
-      
-      <div class="security-notice">
-        <p><strong>🔒 Security Alert:</strong> For your account security, never share this OTP with anyone, including teachers or administrators of ShikshaBridge. Our team will never ask for your code.</p>
-      </div>
-      
-      <p>If you did not request a password reset, you can safely ignore this email. Your current password remains secure.</p>
-    </div>
-    <div class="email-footer">
-      &copy; 2026 ShikshaBridge. Bridging classrooms across India.<br>
-      Need assistance? Contact your school administrator.
-    </div>
+<body style="margin:0;padding:0;background-color:#f2f3ff;font-family:Arial,Helvetica,sans-serif;color:#25234a;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+    Your one-time code is ready. Get back to learning with ShikshaBridge.
   </div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f2f3ff;">
+    <tr>
+      <td align="center" style="padding:36px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:540px;background-color:#ffffff;border:1px solid #e3e4f2;border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="padding:30px 32px 28px;background-color:#5146d8;background-image:linear-gradient(135deg,#5146d8 0%,#7654e8 100%);">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="color:#ffffff;font-size:19px;font-weight:bold;letter-spacing:-0.4px;">&#127891; ShikshaBridge</td>
+                  <td align="right"><span style="display:inline-block;padding:7px 11px;background-color:#ffcf5c;border-radius:20px;color:#4a378b;font-size:10px;font-weight:bold;letter-spacing:0.8px;">LEARN &amp; GROW</span></td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:28px;">
+                <tr>
+                  <td style="padding:7px 11px;background-color:#ffffff;color:#5146d8;border-radius:6px;font-size:11px;font-weight:bold;letter-spacing:1px;">A LITTLE PASSWORD RESET</td>
+                </tr>
+              </table>
+              <h1 style="margin:14px 0 7px;color:#ffffff;font-size:29px;line-height:1.2;letter-spacing:-0.7px;">Your next chapter<br>starts here.</h1>
+              <p style="margin:0;color:#e9e5ff;font-size:14px;line-height:1.6;">One quick step, then you're back to learning.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px 8px;">
+              <p style="margin:0 0 10px;color:#343054;font-size:16px;font-weight:bold;">Hi ${recipientName} <span style="color:#f29b38;">&#10024;</span></p>
+              <p style="margin:0;color:#69677e;font-size:14px;line-height:1.7;">We got your request to reset your password. Enter this code to securely get back into your learning space.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#fff6dc;border:1px solid #ffe39a;border-radius:14px;">
+                <tr>
+                  <td align="center" style="padding:22px 16px 20px;">
+                    <p style="margin:0 0 11px;color:#8a6820;font-size:11px;font-weight:bold;letter-spacing:1.5px;">YOUR ONE-TIME CODE</p>
+                    <div style="color:#403284;font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:bold;letter-spacing:9px;">${safeOtp}</div>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:12px auto 0;">
+                      <tr><td style="padding:6px 10px;background-color:#ffffff;border-radius:20px;color:#776327;font-size:11px;font-weight:bold;">&#9201; &nbsp;Expires in 10 minutes</td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td valign="top" style="width:27px;color:#27a37a;font-size:17px;font-weight:bold;">&#10003;</td>
+                  <td style="color:#69677e;font-size:12px;line-height:1.6;"><strong style="color:#403284;">Keep your code private.</strong> Our team will never ask you to share it.</td>
+                </tr>
+              </table>
+              <p style="margin:16px 0 0;color:#89879a;font-size:12px;line-height:1.6;">If you didn't request this, no action is needed—your password remains unchanged.</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:18px 24px;background-color:#f8f7ff;border-top:1px solid #eeecf8;color:#77758c;font-size:11px;line-height:1.6;">
+              Made for curious minds and brighter classrooms<br>
+              <strong style="color:#5146d8;">ShikshaBridge</strong> <span style="color:#c2bfd5;">&bull;</span> Learning grows here
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
 `
