@@ -2,6 +2,17 @@ const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'Internal Server Error';
 
+  if (statusCode >= 500) {
+    console.error('API request failed', {
+      method: req.method,
+      path: req.originalUrl,
+      statusCode,
+      errorName: err.name,
+      errorCode: err.code,
+      errorMessage: String(message).replace(/mongodb(?:\+srv)?:\/\/\S+/gi, '[redacted MongoDB URI]'),
+    });
+  }
+
   // Body parser entity too large
   if (err.type === 'entity.too.large' || err.statusCode === 413 || err.status === 413) {
     statusCode = 413;
