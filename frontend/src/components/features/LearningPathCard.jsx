@@ -1,28 +1,30 @@
 import React, { useState } from 'react';
 import api from '../../api/axios';
+import Icon from '../common/Icon';
+import ResourceViewerModal from './ResourceViewerModal';
 
 const STEP_ICONS = {
-  revise_concept:     { icon: '📖', color: '#2563EB', bg: '#EFF6FF' },
-  watch_explanation:  { icon: '🎬', color: '#7C3AED', bg: '#F5F3FF' },
-  attempt_remedial:   { icon: '🔧', color: '#E8650A', bg: '#FFF3E8' },
-  retry_diagnostic:   { icon: '📊', color: '#1B7A4E', bg: '#E8F5EE' },
-  unlock_next:        { icon: '🚀', color: '#F5B820', bg: '#FFF8E1' },
-  practice_worksheet: { icon: '📝', color: '#D63B3B', bg: '#FFEBEB' },
+  revise_concept:     { icon: 'book', color: '#2563EB', bg: '#EFF6FF' },
+  watch_explanation:  { icon: 'video', color: '#7C3AED', bg: '#F5F3FF' },
+  attempt_remedial:   { icon: 'wrench', color: '#E8650A', bg: '#FFF3E8' },
+  retry_diagnostic:   { icon: 'chart', color: '#1B7A4E', bg: '#E8F5EE' },
+  unlock_next:        { icon: 'rocket', color: '#F5B820', bg: '#FFF8E1' },
+  practice_worksheet: { icon: 'quiz', color: '#D63B3B', bg: '#FFEBEB' },
 };
 
 const STATUS_CONFIG = {
-  completed:   { badge: '✅ Done',       color: 'var(--secondary)', ring: '#86efac' },
-  available:   { badge: '▶ Start',       color: 'var(--primary)',   ring: 'var(--primary)' },
-  in_progress: { badge: '⏳ In Progress', color: 'var(--accent-dark)', ring: 'var(--accent)' },
-  locked:      { badge: '🔒 Locked',     color: 'var(--gray-400)',  ring: 'var(--gray-300)' },
+  completed:   { badge: 'Done',        color: 'var(--secondary)', ring: '#86efac', icon: 'success' },
+  available:   { badge: 'Start',       color: 'var(--primary)',   ring: 'var(--primary)' },
+  in_progress: { badge: 'In Progress', color: 'var(--accent-dark)', ring: 'var(--accent)', icon: 'clock' },
+  locked:      { badge: 'Locked',      color: 'var(--gray-400)',  ring: 'var(--gray-300)', icon: 'lock' },
 };
 
 export default function LearningPathCard({ path, onAdvance }) {
   const [advancing, setAdvancing] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const [viewingResource, setViewingResource] = useState(null);
 
   const completedSteps = path.steps.filter(s => s.status === 'completed').length;
-  const currentStep = path.steps[path.currentStep];
 
   const handleAdvance = async () => {
     setAdvancing(true);
@@ -64,7 +66,7 @@ export default function LearningPathCard({ path, onAdvance }) {
                 {path.completionPercentage}%
               </text>
             </svg>
-            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1rem' }}>{expanded ? '▲' : '▼'}</span>
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>{expanded ? '▲' : '▼'}</span>
           </div>
         </div>
       </div>
@@ -74,8 +76,9 @@ export default function LearningPathCard({ path, onAdvance }) {
         <div style={{ padding: '16px 18px' }}>
           {/* AI Summary if available */}
           {path.aiSummary && (
-            <div style={{ padding: '10px 14px', background: 'var(--primary-light)', borderRadius: 8, marginBottom: 14, borderLeft: '3px solid var(--primary)', fontSize: '0.82rem', color: 'var(--primary-dark)' }}>
-              🧠 {path.aiSummary}
+            <div style={{ padding: '10px 14px', background: 'var(--primary-light)', borderRadius: 8, marginBottom: 14, borderLeft: '3px solid var(--primary)', fontSize: '0.82rem', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="ai" size={16} color="var(--primary)" />
+              <span>{path.aiSummary}</span>
             </div>
           )}
 
@@ -97,12 +100,16 @@ export default function LearningPathCard({ path, onAdvance }) {
                   <div style={{
                     width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
                     background: step.status === 'completed' ? 'var(--secondary)' : step.status === 'locked' ? 'var(--gray-200)' : typeConfig.bg,
-                    border: `2.5px solid ${step.status === 'locked' ? 'var(--gray-300)' : isCurrent ? statusCfg.ring : typeConfig.color}`,
+                    border: `2px solid ${step.status === 'locked' ? 'var(--gray-300)' : isCurrent ? statusCfg.ring : typeConfig.color}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1rem',
                     boxShadow: isCurrent ? `0 0 0 3px ${typeConfig.color}30` : 'none',
+                    color: step.status === 'completed' ? '#fff' : typeConfig.color,
                   }}>
-                    {step.status === 'completed' ? '✓' : typeConfig.icon}
+                    {step.status === 'completed' ? (
+                      <Icon name="check" size={18} color="#fff" />
+                    ) : (
+                      <Icon name={typeConfig.icon} size={18} color={typeConfig.color} />
+                    )}
                   </div>
 
                   {/* Content */}
@@ -111,7 +118,8 @@ export default function LearningPathCard({ path, onAdvance }) {
                       <div style={{ fontWeight: 700, fontSize: '0.875rem', color: step.status === 'locked' ? 'var(--gray-400)' : 'var(--gray-900)' }}>
                         {step.title}
                       </div>
-                      <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 12, background: step.status === 'completed' ? 'var(--secondary-light)' : isCurrent ? 'var(--primary-light)' : 'var(--gray-100)', color: statusCfg.color, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 12, background: step.status === 'completed' ? 'var(--secondary-light)' : isCurrent ? 'var(--primary-light)' : 'var(--gray-100)', color: statusCfg.color, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {statusCfg.icon && <Icon name={statusCfg.icon} size={12} color={statusCfg.color} />}
                         {statusCfg.badge}
                       </span>
                     </div>
@@ -119,17 +127,51 @@ export default function LearningPathCard({ path, onAdvance }) {
                       <p style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginTop: 2 }}>{step.description}</p>
                     )}
                     <div className="flex gap-3 mt-1">
-                      {step.estimatedMinutes > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--gray-400)' }}>⏱ {step.estimatedMinutes} min</span>}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-dark)' }}>⭐ +{step.xpReward} XP</span>
+                      {step.estimatedMinutes > 0 && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--gray-400)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="clock" size={12} color="var(--gray-400)" />
+                          {step.estimatedMinutes} min
+                        </span>
+                      )}
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-dark)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Icon name="star" size={12} color="var(--accent-dark)" />
+                        +{step.xpReward} XP
+                      </span>
                     </div>
 
-                    {/* Advance button for current available step */}
-                    {isCurrent && (
-                      <button className="btn btn-primary btn-sm" style={{ marginTop: 8, fontSize: '0.78rem' }}
-                        onClick={handleAdvance} disabled={advancing}>
-                        {advancing ? '⏳ Marking…' : '✓ Mark as Done'}
-                      </button>
-                    )}
+                    <div className="flex gap-2 flex-wrap items-center mt-2">
+                      {/* View resource in-app button */}
+                      {step.resourceId && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          style={{ fontSize: '0.75rem', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                          onClick={async () => {
+                            try {
+                              const { data } = await api.get(`/features/resources/${step.resourceId}`);
+                              setViewingResource(data.data);
+                            } catch {
+                              setViewingResource({
+                                title: step.title,
+                                type: step.resourceType || 'note',
+                                content: step.description,
+                              });
+                            }
+                          }}
+                        >
+                          <Icon name={step.resourceType === 'video' ? 'video' : 'file'} size={12} color="var(--primary)" />
+                          <span>{step.resourceType === 'video' ? 'Watch In-App' : 'Read In-App'}</span>
+                        </button>
+                      )}
+
+                      {/* Advance button for current available step */}
+                      {isCurrent && (
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: '0.78rem' }}
+                          onClick={handleAdvance} disabled={advancing}>
+                          {advancing ? 'Marking…' : 'Mark as Done'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -137,12 +179,19 @@ export default function LearningPathCard({ path, onAdvance }) {
           </div>
 
           {path.status === 'completed' && (
-            <div style={{ textAlign: 'center', padding: '14px', background: 'var(--secondary-light)', borderRadius: 10, marginTop: 8, color: 'var(--secondary-dark)', fontWeight: 700 }}>
-              🎉 Path Completed! Concept Mastered!
+            <div style={{ textAlign: 'center', padding: '14px', background: 'var(--secondary-light)', borderRadius: 10, marginTop: 8, color: 'var(--secondary-dark)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Icon name="sparkles" size={18} color="var(--secondary-dark)" />
+              <span>Path Completed! Concept Mastered!</span>
             </div>
           )}
         </div>
       )}
+
+      <ResourceViewerModal
+        open={!!viewingResource}
+        onClose={() => setViewingResource(null)}
+        resource={viewingResource}
+      />
     </div>
   );
 }

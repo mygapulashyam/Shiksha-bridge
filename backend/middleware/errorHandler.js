@@ -39,10 +39,15 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 401;
   }
 
-  // In production, don't leak stack traces
+  // In production, sanitize 500 errors so sensitive internal details don't leak
+  let clientMessage = message;
+  if (statusCode >= 500 && process.env.NODE_ENV === 'production') {
+    clientMessage = 'An unexpected server error occurred. Please try again later.';
+  }
+
   const response = {
     success: false,
-    message,
+    message: clientMessage,
   };
   if (process.env.NODE_ENV === 'development') {
     response.stack = err.stack;

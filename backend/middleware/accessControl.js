@@ -9,6 +9,10 @@ const verifyStudentAccess = async (req, res, next) => {
       return next();
     }
 
+    if (req.user.role === 'admin') {
+      return next();
+    }
+
     if (req.user.role === 'student') {
       if (studentId.toString() !== req.user._id.toString()) {
         return res.status(403).json({ success: false, message: 'Access denied: You can only access your own data.' });
@@ -21,7 +25,7 @@ const verifyStudentAccess = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Student not found.' });
     }
 
-    // Check school matches
+    // Check school matches (for non-admin users)
     if (student.school?.toString() !== req.user.school?.toString()) {
       return res.status(403).json({ success: false, message: 'Access denied: Student is not in your school.' });
     }
@@ -50,6 +54,10 @@ const verifyClassAccess = async (req, res, next) => {
   try {
     const classId = req.params.classId || req.query.classId || req.body.classId;
     if (!classId) {
+      return next();
+    }
+
+    if (req.user.role === 'admin') {
       return next();
     }
 

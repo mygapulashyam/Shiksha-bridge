@@ -163,6 +163,14 @@ const getQuizForAttempt = asyncHandler(async (req, res) => {
 ══════════════════════════════════════════════════ */
 const startAttempt = asyncHandler(async (req, res) => {
   const { quizId } = req.body;
+  if (!quizId) {
+    return res.status(400).json({ success: false, message: 'quizId is required' });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(quizId)) {
+    return res.status(400).json({ success: false, message: 'Invalid quiz ID format' });
+  }
+
   const student = req.user;
   const quiz = await Quiz.findById(quizId);
   if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
@@ -176,43 +184,75 @@ const startAttempt = asyncHandler(async (req, res) => {
   const durationMinutes = quiz.duration || 20;
   const now = new Date();
 
+  // If there's an existing in_progress attempt, check if its deadline has already expired
   const existingAttempt = await Attempt.findOne({ student: student._id, quiz: quizId, status: 'in_progress' });
   if (existingAttempt) {
     const started = new Date(existingAttempt.startedAt || now);
     const deadline = existingAttempt.deadline || new Date(started.getTime() + durationMinutes * 60 * 1000 + 30000);
-    if (!existingAttempt.deadline) {
-      existingAttempt.deadline = deadline;
-      await existingAttempt.save();
-    }
-    const remainingSeconds = Math.max(0, Math.round((deadline.getTime() - Date.now()) / 1000));
+    const remainingSeconds = Math.round((deadline.getTime() - Date.now()) / 1000);
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        attemptId: existingAttempt._id,
-        answers: existingAttempt.answers,
-        startedAt: existingAttempt.startedAt,
-        deadline,
-        duration: durationMinutes,
-        remainingSeconds,
-      },
-    });
+    // If previous attempt time expired, mark it as completed/abandoned and allow starting a fresh attempt
+    if (remainingSeconds <= -30) {
+      existingAttempt.status = 'completed';
+      existingAttempt.completedAt = new Date();
+      await existingAttempt.save();
+    } else {
+      if (!existingAttempt.deadline) {
+        existingAttempt.deadline = deadline;
+        await existingAttempt.save();
+      }
+      return res.status(200).json({
+        success: true,
+        data: {
+          attemptId: existingAttempt._id,
+          answers: existingAttempt.answers,
+          startedAt: existingAttempt.startedAt,
+          deadline,
+          duration: durationMinutes,
+          remainingSeconds: Math.max(0, remainingSeconds),
+        },
+      });
+    }
   }
 
   const deadline = new Date(now.getTime() + durationMinutes * 60 * 1000 + 30000);
   const prevAttempts = await Attempt.countDocuments({ student: student._id, quiz: quizId });
-  const attempt = await Attempt.create({
-    student: student._id,
-    quiz: quizId,
-    school: student.school,
-    class: student.class,
-    subject: quiz.subject,
-    totalMarks: quiz.totalMarks,
-    status: 'in_progress',
-    startedAt: now,
-    deadline,
-    attemptNumber: prevAttempts + 1,
-  });
+  let attempt;
+  try {
+    attempt = await Attempt.create({
+      student: student._id,
+      quiz: quizId,
+      school: student.school,
+      class: student.class,
+      subject: quiz.subject,
+      totalMarks: quiz.totalMarks,
+      status: 'in_progress',
+      startedAt: now,
+      deadline,
+      attemptNumber: prevAttempts + 1,
+    });
+  } catch (createErr) {
+    // If a concurrent request created the in_progress attempt first, fetch and return it
+    if (createErr.code === 11000) {
+      const raceAttempt = await Attempt.findOne({ student: student._id, quiz: quizId, status: 'in_progress' });
+      if (raceAttempt) {
+        const raceDeadline = raceAttempt.deadline || deadline;
+        const raceRemaining = Math.max(0, Math.round((raceDeadline.getTime() - Date.now()) / 1000));
+        return res.status(200).json({
+          success: true,
+          data: {
+            attemptId: raceAttempt._id,
+            answers: raceAttempt.answers || [],
+            startedAt: raceAttempt.startedAt,
+            deadline: raceDeadline,
+            duration: durationMinutes,
+            remainingSeconds: raceRemaining,
+          },
+        });
+      }
+    }
+    throw createErr;
+  }
 
   res.status(201).json({
     success: true,
@@ -234,12 +274,29 @@ const saveAnswers = asyncHandler(async (req, res) => {
   if (attempt.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorised' });
   if (attempt.status === 'completed') return res.status(400).json({ success: false, message: 'Quiz already completed' });
 
-  attempt.answers = answers.map(a => ({
-    question: a.questionId || a.question,
-    selectedOption: a.selectedOption,
-    enteredAnswer: a.enteredAnswer,
-    timeTaken: a.timeTaken,
-  }));
+  // Enforce quiz deadline
+  const now = new Date();
+  if (attempt.deadline && now > new Date(attempt.deadline.getTime() + 15000)) {
+    return res.status(400).json({ success: false, message: 'Quiz deadline has passed. Answers cannot be saved.' });
+  }
+
+  // Validate that question IDs belong to this quiz
+  const quiz = await Quiz.findById(attempt.quiz).select('questions');
+  const validQuestionIds = new Set(quiz?.questions?.map(q => q.question?.toString()) || []);
+
+  const sanitizedAnswers = answers
+    .filter(a => {
+      const qId = (a.questionId || a.question)?.toString();
+      return validQuestionIds.has(qId);
+    })
+    .map(a => ({
+      question: a.questionId || a.question,
+      selectedOption: a.selectedOption,
+      enteredAnswer: a.enteredAnswer,
+      timeTaken: a.timeTaken,
+    }));
+
+  attempt.answers = sanitizedAnswers;
 
   // Enforce server-side time calculation
   const elapsedSeconds = Math.max(1, Math.round((Date.now() - new Date(attempt.startedAt).getTime()) / 1000));
@@ -251,24 +308,44 @@ const saveAnswers = asyncHandler(async (req, res) => {
 
 const submitAttempt = asyncHandler(async (req, res) => {
   const { attemptId, answers = [] } = req.body;
-  const attempt = await Attempt.findById(attemptId);
-  if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
-  if (attempt.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorised' });
-  if (attempt.status === 'completed') {
-    return res.json({
-      success: true,
-      message: 'Quiz already submitted',
-      data: {
-        attemptId: attempt._id,
-        percentage: attempt.percentage,
-        marksObtained: attempt.marksObtained,
-        totalMarks: attempt.totalMarks,
-        conceptScores: attempt.conceptScores,
-        newBadges: [],
-        streakUpdated: false,
-        aiAnalysis: null,
-      },
-    });
+
+  // Atomically lock attempt in progress to prevent concurrent double submission
+  const attempt = await Attempt.findOneAndUpdate(
+    { _id: attemptId, student: req.user._id, status: 'in_progress' },
+    { $set: { status: 'submitting' } },
+    { new: true }
+  );
+
+  if (!attempt) {
+    const existing = await Attempt.findById(attemptId);
+    if (!existing) return res.status(404).json({ success: false, message: 'Attempt not found' });
+    if (existing.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorised' });
+    if (existing.status === 'completed' || existing.status === 'submitting') {
+      return res.json({
+        success: true,
+        message: 'Quiz already submitted',
+        data: {
+          attemptId: existing._id,
+          percentage: existing.percentage,
+          marksObtained: existing.marksObtained,
+          totalMarks: existing.totalMarks,
+          conceptScores: existing.conceptScores,
+          newBadges: [],
+          streakUpdated: false,
+          aiAnalysis: null,
+        },
+      });
+    }
+  }
+
+  // Enforce deadline with 30-second network grace period
+  const now = new Date();
+  if (attempt.deadline && now > new Date(attempt.deadline.getTime() + 30000)) {
+    // Deadline passed significantly
+    attempt.status = 'completed';
+    attempt.completedAt = now;
+    await attempt.save();
+    return res.status(400).json({ success: false, message: 'Quiz deadline has expired. Submission was rejected.' });
   }
 
   const quiz = await Quiz.findById(attempt.quiz).populate({ path: 'questions.question', populate: { path: 'concept', select: '_id name' } });
@@ -297,7 +374,9 @@ const submitAttempt = asyncHandler(async (req, res) => {
           (studentSelectedOpt && correct.text?.trim().toLowerCase() === studentSelectedOpt.text?.trim().toLowerCase())
         ));
       } else if (question.type === 'fillblank') {
-        isCorrect = question.correctAnswer?.toLowerCase().trim() === enteredAnswer?.toLowerCase().trim();
+        const correctClean = (question.correctAnswer || '').toLowerCase().trim();
+        const enteredClean = (enteredAnswer || '').toLowerCase().trim();
+        isCorrect = Boolean(correctClean && enteredClean && correctClean === enteredClean);
       }
     }
 
@@ -510,11 +589,40 @@ const getMyAttempts = asyncHandler(async (req, res) => {
 
 const getAttemptDetail = asyncHandler(async (req, res) => {
   const attempt = await Attempt.findOne({ _id: req.params.id, student: req.user._id })
-    .populate('quiz', 'title type totalMarks')
+    .populate('quiz', 'title type totalMarks duration')
     .populate('subject', 'name icon color')
-    .populate({ path: 'answers.question', populate: { path: 'concept', select: 'name' } })
+    .populate({
+      path: 'answers.question',
+      select: attempt?.status === 'completed' ? '' : '-correctAnswer -explanation -explanationHindi',
+      populate: { path: 'concept', select: 'name' }
+    })
     .populate('conceptScores.concept', 'name chapter');
+
   if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
+
+  // If quiz is not completed, strip answers to prevent mid-quiz cheating
+  if (attempt.status !== 'completed') {
+    const sanitizedAnswers = (attempt.answers || []).map(a => ({
+      question: a.question?._id || a.question,
+      selectedOption: a.selectedOption,
+      enteredAnswer: a.enteredAnswer,
+      timeTaken: a.timeTaken,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        _id: attempt._id,
+        quiz: attempt.quiz,
+        subject: attempt.subject,
+        status: attempt.status,
+        startedAt: attempt.startedAt,
+        deadline: attempt.deadline,
+        answers: sanitizedAnswers,
+      },
+    });
+  }
+
   res.json({ success: true, data: attempt });
 });
 
@@ -530,21 +638,40 @@ const getMyRecommendations = asyncHandler(async (req, res) => {
 
 const updateRecommendationStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
-  const rec = await Recommendation.findOne({ _id: req.params.id, student: req.user._id });
-  if (!rec) return res.status(404).json({ success: false, message: 'Not found' });
 
-  // Only award XP once when transitioning to completed
-  if (rec.status !== 'completed' && status === 'completed') {
-    rec.completedAt = new Date();
-    const studentUser = await User.findById(req.user._id);
-    if (studentUser) {
-      studentUser.addXP(15);
-      await studentUser.save({ validateBeforeSave: false });
+  let rec;
+  if (status === 'completed') {
+    // Atomically find recommendation where xpAwarded is false
+    rec = await Recommendation.findOneAndUpdate(
+      { _id: req.params.id, student: req.user._id, xpAwarded: { $ne: true } },
+      { $set: { status: 'completed', completedAt: new Date(), xpAwarded: true } },
+      { new: true }
+    );
+
+    if (rec) {
+      const studentUser = await User.findById(req.user._id);
+      if (studentUser) {
+        studentUser.addXP(15);
+        await studentUser.save({ validateBeforeSave: false });
+      }
+    } else {
+      // Already awarded XP or status update only
+      rec = await Recommendation.findOneAndUpdate(
+        { _id: req.params.id, student: req.user._id },
+        { $set: { status: 'completed', completedAt: new Date() } },
+        { new: true }
+      );
     }
+  } else {
+    // Transitioning back to pending/in_progress does NOT reset xpAwarded
+    rec = await Recommendation.findOneAndUpdate(
+      { _id: req.params.id, student: req.user._id },
+      { $set: { status } },
+      { new: true }
+    );
   }
 
-  rec.status = status;
-  await rec.save();
+  if (!rec) return res.status(404).json({ success: false, message: 'Recommendation not found' });
   res.json({ success: true, data: rec });
 });
 
@@ -557,11 +684,11 @@ const getLearningPaths = asyncHandler(async (req, res) => {
 });
 
 const advanceLearningPath = asyncHandler(async (req, res) => {
-  const { path, advanced, completedStep } = await advancePathStep(req.params.id, req.user._id);
+  const { path, advanced, completedStep, stepAwardedXp } = await advancePathStep(req.params.id, req.user._id);
   if (!path) return res.status(404).json({ success: false, message: 'Path not found' });
 
-  // Only award XP if the step was actually advanced
-  if (advanced && completedStep) {
+  // Only award XP if the step was actually advanced and has not previously awarded XP
+  if (advanced && completedStep && stepAwardedXp) {
     const studentUser = await User.findById(req.user._id);
     if (studentUser) {
       studentUser.addXP(completedStep.xpReward || 20);

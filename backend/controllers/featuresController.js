@@ -359,7 +359,27 @@ const answerDoubt = asyncHandler(async (req, res) => {
 ════════════════════════════════════════════════════ */
 const createResource = asyncHandler(async (req, res) => {
   const resourceData = { ...req.body, createdBy: req.user._id, school: req.user.school };
-  if (resourceData.concept === '') delete resourceData.concept;
+  if (!resourceData.title || !resourceData.title.trim()) {
+    return res.status(400).json({ success: false, message: 'Resource title is required' });
+  }
+
+  // Sanitize empty strings for ObjectId fields
+  if (!resourceData.concept || resourceData.concept === '') delete resourceData.concept;
+  if (!resourceData.subject || resourceData.subject === '') delete resourceData.subject;
+
+  // Validate URL schemes (prevent javascript: or data: schemes)
+  const isSafeUrl = (urlStr) => {
+    if (!urlStr || typeof urlStr !== 'string') return true;
+    const trimmed = urlStr.trim().toLowerCase();
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  };
+
+  if (resourceData.videoUrl && !isSafeUrl(resourceData.videoUrl)) {
+    return res.status(400).json({ success: false, message: 'Invalid video URL. Only http:// and https:// URLs are allowed.' });
+  }
+  if (resourceData.fileUrl && !isSafeUrl(resourceData.fileUrl)) {
+    return res.status(400).json({ success: false, message: 'Invalid file URL. Only http:// and https:// URLs are allowed.' });
+  }
 
   const resource = await ContentResource.create(resourceData);
   res.status(201).json({ success: true, data: resource });
@@ -367,25 +387,83 @@ const createResource = asyncHandler(async (req, res) => {
 
 const getResources = asyncHandler(async (req, res) => {
   const filter = { isActive: true };
-  if (req.query.concept) filter.concept = req.query.concept;
-  if (req.query.type) filter.type = req.query.type;
-  if (req.query.language) filter.language = req.query.language;
+
+  // Only apply concept if it is a valid non-empty string / valid ObjectId
+  if (req.query.concept && typeof req.query.concept === 'string' && req.query.concept.trim()) {
+    const conceptTrimmed = req.query.concept.trim();
+    if (/^[0-9a-fA-F]{24}$/.test(conceptTrimmed)) {
+      filter.concept = conceptTrimmed;
+    }
+  }
+
+  // Allowed resource types per schema: ['note', 'video', 'worksheet', 'example', 'step_solution', 'practice_set']
+  const validTypes = ['note', 'video', 'worksheet', 'example', 'step_solution', 'practice_set'];
+  if (req.query.type && validTypes.includes(req.query.type)) {
+    filter.type = req.query.type;
+  }
+
+  // Allowed languages per schema: ['en', 'hi', 'gu', 'te', 'bilingual']
+  const validLanguages = ['en', 'hi', 'gu', 'te', 'bilingual'];
+  if (req.query.language && validLanguages.includes(req.query.language)) {
+    filter.language = req.query.language;
+  }
 
   // Students must only see approved resources that belong to their school or are platform-wide (school is null/undefined)
-  if (req.user.role === 'student') {
+  if (req.user?.role === 'student') {
     filter.isApproved = true;
-    filter.$or = [{ school: req.user.school }, { school: null }, { school: { $exists: false } }];
-  } else if (req.query.isApproved !== undefined) {
+    if (req.user.school) {
+      filter.$or = [{ school: req.user.school }, { school: null }, { school: { $exists: false } }];
+    } else {
+      filter.$or = [{ school: null }, { school: { $exists: false } }];
+    }
+  } else if (req.query.isApproved !== undefined && req.query.isApproved !== '') {
     filter.isApproved = req.query.isApproved === 'true';
   }
 
-  // Teacher / admin query filter by school if supplied or restricted to their school
-  if (req.user.role === 'teacher') {
-    filter.$or = [{ school: req.user.school }, { school: null }, { school: { $exists: false } }];
+  // Teacher / admin query filter by school if user has school attached or platform-wide
+  if (req.user?.role === 'teacher') {
+    if (req.user.school) {
+      filter.$or = [{ school: req.user.school }, { school: null }, { school: { $exists: false } }];
+    } else {
+      filter.$or = [{ school: null }, { school: { $exists: false } }];
+    }
   }
 
-  const result = await paginate(ContentResource, filter, { populate: { path: 'concept', select: 'name chapter' } }, req);
+  const result = await paginate(
+    ContentResource,
+    filter,
+    {
+      populate: [
+        { path: 'concept', select: 'name chapter' },
+        { path: 'subject', select: 'name icon' },
+        { path: 'createdBy', select: 'name email role' },
+        { path: 'school', select: 'name' },
+      ],
+      sort: { createdAt: -1 }
+    },
+    req
+  );
   res.json({ success: true, ...result });
+});
+
+const getResourceById = asyncHandler(async (req, res) => {
+  const resource = await ContentResource.findById(req.params.id)
+    .populate('concept', 'name chapter')
+    .populate('subject', 'name icon color')
+    .populate('createdBy', 'name email role')
+    .populate('school', 'name');
+
+  if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
+
+  // If student is viewing, ensure resource is approved and accessible
+  if (req.user?.role === 'student' && !resource.isApproved) {
+    return res.status(403).json({ success: false, message: 'Resource is pending approval' });
+  }
+
+  // Increment view counter asynchronously
+  ContentResource.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } }).exec();
+
+  res.json({ success: true, data: resource });
 });
 
 const approveResource = asyncHandler(async (req, res) => {
@@ -541,7 +619,7 @@ module.exports = {
   getAlerts, markAlertRead, dismissAlert, markAllAlertsRead, triggerScheduledAlerts,
   getStudentHeatmap, getClassHeatmap,
   getClassDoubts, answerDoubt,
-  createResource, getResources, approveResource, rejectResource,
+  createResource, getResources, getResourceById, approveResource, rejectResource,
   importCSV, getCSVTemplateDownload,
   getImprovementTracking,
   getDistrictRankings,

@@ -36,14 +36,38 @@ const createQuiz = asyncHandler(async (req, res) => {
     dueDate,
   } = req.body;
 
+  // Validate assignedClass if provided
+  let validatedAssignedClass = undefined;
+  if (assignedClass) {
+    const targetClass = await Class.findById(assignedClass);
+    if (!targetClass) {
+      return res.status(400).json({ success: false, message: 'Assigned class not found' });
+    }
+    if (req.user.role === 'teacher' && targetClass.school.toString() !== req.user.school.toString()) {
+      return res.status(403).json({ success: false, message: 'Cannot assign quiz to a class in another school' });
+    }
+    validatedAssignedClass = targetClass._id;
+  }
+
+  // Validate assignedTo students if provided
+  let validatedAssignedTo = [];
+  if (Array.isArray(assignedTo) && assignedTo.length > 0) {
+    const validStudents = await User.find({
+      _id: { $in: assignedTo },
+      role: 'student',
+      school: req.user.school,
+    }).select('_id');
+    validatedAssignedTo = validStudents.map(s => s._id);
+  }
+
   const quiz = await Quiz.create({
     title,
     description,
     type: type || 'diagnostic',
     subject,
     class: (classId === '' || classId === null) ? undefined : classId,
-    assignedClass: (assignedClass === '' || assignedClass === null) ? undefined : assignedClass,
-    assignedTo: Array.isArray(assignedTo) ? assignedTo.filter(Boolean) : [],
+    assignedClass: validatedAssignedClass,
+    assignedTo: validatedAssignedTo,
     grade,
     chapter,
     concepts: Array.isArray(concepts) ? concepts.filter(Boolean) : [],
@@ -105,7 +129,7 @@ const updateQuiz = asyncHandler(async (req, res) => {
   }
 
   // Allowlist includes assignedClass and type
-  const allowed = ['title', 'description', 'type', 'duration', 'totalMarks', 'grade', 'subject', 'class', 'assignedClass', 'concepts', 'questions', 'isActive', 'dueDate'];
+  const allowed = ['title', 'description', 'type', 'duration', 'totalMarks', 'grade', 'subject', 'class', 'assignedClass', 'concepts', 'isActive', 'dueDate'];
   allowed.forEach(k => {
     if (req.body[k] !== undefined) {
       if ((k === 'class' || k === 'assignedClass') && req.body[k] === '') {
@@ -115,6 +139,28 @@ const updateQuiz = asyncHandler(async (req, res) => {
       }
     }
   });
+
+  // Validate questions array if updating questions
+  if (Array.isArray(req.body.questions)) {
+    const questionIds = req.body.questions.map(q => q.question || q._id || q);
+    // Question must be created by this teacher or admin, or be currently in this quiz
+    const existingQuizQuestionIds = (quiz.questions || []).map(q => q.question?.toString());
+    const validQuestions = await Question.find({
+      $or: [
+        { _id: { $in: questionIds }, createdBy: req.user._id },
+        { _id: { $in: existingQuizQuestionIds } }
+      ]
+    }).select('_id');
+    const validSet = new Set(validQuestions.map(q => q._id.toString()));
+
+    quiz.questions = req.body.questions
+      .filter(q => validSet.has((q.question || q._id || q)?.toString()))
+      .map((q, idx) => ({
+        question: q.question || q._id || q,
+        order: q.order || idx + 1,
+        marks: q.marks || 1,
+      }));
+  }
 
   // If client is attempting to publish via PUT, run validation
   if (req.body.isPublished === true && !quiz.isPublished) {
@@ -420,13 +466,32 @@ const getStudentDetail = asyncHandler(async (req, res) => {
 ═══════════════════════════════════════════ */
 const getMyStudents = asyncHandler(async (req, res) => {
   const filter = { role: 'student', school: req.user.school, isActive: true };
-  if (req.query.class) filter.class = req.query.class;
+
+  // If teacher, restrict to students in classes assigned to this teacher
+  if (req.user.role === 'teacher') {
+    const teacherClasses = req.user.classes || [];
+    if (req.query.class) {
+      if (!teacherClasses.some(cId => cId.toString() === req.query.class.toString())) {
+        return res.status(403).json({ success: false, message: 'You are not assigned to this class' });
+      }
+      filter.class = req.query.class;
+    } else {
+      filter.class = { $in: teacherClasses };
+    }
+  } else if (req.query.class) {
+    filter.class = req.query.class;
+  }
+
   if (req.query.search) filter.name = new RegExp(escapeRegex(req.query.search.trim()), 'i');
 
   const result = await paginate(
     User,
     filter,
-    { populate: { path: 'class', select: 'name grade section' }, sort: { name: 1 } },
+    {
+      select: '-password -refreshTokens',
+      populate: { path: 'class', select: 'name grade section' },
+      sort: { name: 1 },
+    },
     req
   );
   res.json({ success: true, ...result });

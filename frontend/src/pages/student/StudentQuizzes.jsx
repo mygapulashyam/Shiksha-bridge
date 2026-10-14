@@ -4,9 +4,10 @@ import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, PageLoader, Pagination, SearchInput, SectionHeader } from '../../components/common/UI';
 import api from '../../api/axios';
 
+import Icon from '../../components/common/Icon';
+
 const TYPE_COLORS = { diagnostic: 'badge-primary', practice: 'badge-success', remedial: 'badge-warning', assessment: 'badge-info' };
-const TYPE_ICONS = { diagnostic: '🔍', practice: '📖', remedial: '🔧', assessment: '📊' };
-const DIFF_LABELS = { foundational: '⭐', basic: '⭐⭐', intermediate: '⭐⭐⭐', advanced: '⭐⭐⭐⭐', mixed: '🔀' };
+const TYPE_ICON_NAMES = { diagnostic: 'search', practice: 'book', remedial: 'wrench', assessment: 'chart' };
 
 export default function StudentQuizzes() {
   const [quizzes, setQuizzes] = useState([]);
@@ -50,9 +51,19 @@ export default function StudentQuizzes() {
         {['', 'diagnostic', 'practice', 'remedial', 'assessment'].map(t => (
           <button key={t}
             className={`btn btn-sm ${filter.type === t ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ border: '1px solid var(--gray-200)' }}
+            style={{ border: '1px solid var(--gray-200)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             onClick={() => { setFilter(p => ({ ...p, type: t })); setPage(1); }}>
-            {t ? `${TYPE_ICONS[t]} ${t.charAt(0).toUpperCase() + t.slice(1)}` : '🗂 All Types'}
+            {t ? (
+              <>
+                <Icon name={TYPE_ICON_NAMES[t] || 'quiz'} size={14} />
+                <span>{t.charAt(0).toUpperCase() + t.slice(1)}</span>
+              </>
+            ) : (
+              <>
+                <Icon name="dashboard" size={14} />
+                <span>All Types</span>
+              </>
+            )}
           </button>
         ))}
       </div>
@@ -60,7 +71,7 @@ export default function StudentQuizzes() {
       {loading ? (
         <div className="page-loader"><div className="spinner" /></div>
       ) : quizzes.length === 0 ? (
-        <EmptyState icon="📝" title="No quizzes available"
+        <EmptyState icon="quiz" title="No quizzes available"
           message="Your teacher hasn't assigned any quizzes yet. Check back soon!" />
       ) : (
         <>
@@ -76,15 +87,18 @@ export default function StudentQuizzes() {
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--gray-200)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <span className={`badge ${TYPE_COLORS[q.type] || 'badge-gray'}`} style={{ textTransform: 'capitalize' }}>
-                    {TYPE_ICONS[q.type]} {q.type}
+                  <span className={`badge ${TYPE_COLORS[q.type] || 'badge-gray'}`} style={{ textTransform: 'capitalize', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name={TYPE_ICON_NAMES[q.type] || 'quiz'} size={12} />
+                    <span>{q.type}</span>
                   </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>{DIFF_LABELS[q.difficulty]}</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase' }}>{q.difficulty}</span>
                 </div>
 
                 {/* Subject */}
                 <div className="flex items-center gap-2">
-                  <span style={{ fontSize: '1.6rem' }}>{q.subject?.icon || '📚'}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: 'var(--primary-light)', color: 'var(--primary)' }}>
+                    <Icon name="book" size={20} color="var(--primary)" />
+                  </span>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--gray-900)', lineHeight: 1.2 }}>{q.title}</div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginTop: 2 }}>{q.subject?.name}</div>
@@ -105,9 +119,18 @@ export default function StudentQuizzes() {
 
                 {/* Meta */}
                 <div style={{ display: 'flex', gap: 16, fontSize: '0.8rem', color: 'var(--gray-500)' }}>
-                  <span>❓ {q.questions?.length || 0} questions</span>
-                  <span>⏱ {q.duration} mins</span>
-                  <span>📊 {q.totalMarks} marks</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="question" size={13} color="var(--gray-400)" />
+                    <span>{q.questions?.length || 0} Qs</span>
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="clock" size={13} color="var(--gray-400)" />
+                    <span>{q.duration} mins</span>
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="chart" size={13} color="var(--gray-400)" />
+                    <span>{q.totalMarks} marks</span>
+                  </span>
                 </div>
 
                 {/* CTA */}

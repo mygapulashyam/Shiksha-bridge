@@ -140,9 +140,14 @@ const advancePathStep = async (pathId, studentId) => {
   if (path.status === 'completed') return { path, advanced: false };
 
   const current = path.steps[path.currentStep];
+  let stepAwardedXp = false;
   if (current) {
     current.status = 'completed';
     current.completedAt = new Date();
+    if (!current.xpAwarded) {
+      current.xpAwarded = true;
+      stepAwardedXp = true;
+    }
   }
 
   const nextIdx = path.currentStep + 1;
@@ -159,7 +164,7 @@ const advancePathStep = async (pathId, studentId) => {
   );
 
   await path.save();
-  return { path, advanced: true, completedStep: current };
+  return { path, advanced: true, completedStep: current, stepAwardedXp };
 };
 
 /**

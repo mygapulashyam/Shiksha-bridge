@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Modal, Pagination, SearchInput, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const BLANK = { name: '', district: '', state: '', block: '', type: 'government', medium: 'hindi', board: 'state', udiseCode: '', principalName: '', phone: '' };
@@ -55,7 +56,10 @@ export default function AdminSchools() {
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">Schools</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="school" size={26} color="var(--primary)" />
+          <span>Schools</span>
+        </h1>
         <p className="page-subtitle">Manage all registered schools on the platform</p>
       </div>
 
@@ -66,7 +70,10 @@ export default function AdminSchools() {
         <div className="flex items-center justify-between mb-4" style={{ flexWrap: 'wrap', gap: 12 }}>
           <SearchInput value={search} onChange={setSearch} placeholder="Search by state..." style={{ maxWidth: 280 }} />
           <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm" onClick={() => fetchSchools(page)}>🔄 Refresh</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => fetchSchools(page)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="refresh" size={13} color="currentColor" />
+              <span>Refresh</span>
+            </button>
             <button className="btn btn-primary btn-sm" onClick={() => setModal(true)}>+ Add School</button>
           </div>
         </div>
@@ -74,7 +81,7 @@ export default function AdminSchools() {
         {loading ? (
           <div className="page-loader" style={{ minHeight: 200 }}><div className="spinner" /></div>
         ) : schools.length === 0 ? (
-          <EmptyState icon="🏫" title="No schools yet" message="Add your first school to get started."
+          <EmptyState icon="school" title="No schools yet" message="Add your first school to get started."
             action={<button className="btn btn-primary" onClick={() => setModal(true)}>+ Add School</button>} />
         ) : (
           <div className="table-wrapper">

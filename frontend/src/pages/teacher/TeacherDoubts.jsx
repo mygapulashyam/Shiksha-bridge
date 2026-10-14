@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Modal, Pagination } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const STATUS_COLORS = { open: 'badge-danger', answered: 'badge-success', closed: 'badge-gray' };
@@ -100,7 +101,10 @@ export default function TeacherDoubts() {
     <Layout>
       <div className="page-header">
         <div>
-          <h1 className="page-title">❓ Doubt Box</h1>
+          <h1 className="page-title flex items-center gap-2">
+            <Icon name="doubts" size={26} color="var(--primary)" />
+            <span>Doubt Box</span>
+          </h1>
           <p className="page-subtitle">Answer student doubts submitted after quizzes</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -109,8 +113,9 @@ export default function TeacherDoubts() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse 2s infinite' }} />
             Live · Refreshed {lastRefresh.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={handleRefresh} style={{ border: '1px solid var(--gray-200)', position: 'relative' }}>
-            🔄 Refresh
+          <button className="btn btn-ghost btn-sm" onClick={handleRefresh} style={{ border: '1px solid var(--gray-200)', position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="refresh" size={14} color="currentColor" />
+            <span>Refresh</span>
             {newCount > 0 && (
               <span style={{
                 position: 'absolute', top: -6, right: -6,
@@ -136,7 +141,8 @@ export default function TeacherDoubts() {
           color: 'var(--primary-dark)', fontWeight: 600, fontSize: '0.875rem',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          🔔 {newCount} new doubt{newCount > 1 ? 's' : ''} received! Click to refresh.
+          <Icon name="bell" size={16} color="var(--primary)" />
+          <span>{newCount} new doubt{newCount > 1 ? 's' : ''} received! Click to refresh.</span>
         </div>
       )}
 
@@ -155,7 +161,7 @@ export default function TeacherDoubts() {
 
       {/* No class configured */}
       {classes.length === 0 && !loading && (
-        <EmptyState icon="🏫" title="No classes assigned"
+        <EmptyState icon="school" title="No classes assigned"
           message="You need at least one class assigned to your account to view doubts. Contact your admin." />
       )}
 
@@ -165,9 +171,10 @@ export default function TeacherDoubts() {
           <div className="flex gap-2 mb-4 items-center">
             {['open', 'answered', 'closed'].map(s => (
               <button key={s} className={`btn btn-sm ${statusFilter === s ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ border: '1px solid var(--gray-200)', textTransform: 'capitalize' }}
+                style={{ border: '1px solid var(--gray-200)', textTransform: 'capitalize', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 onClick={() => handleStatusFilter(s)}>
-                {s === 'open' ? '🔴' : s === 'answered' ? '✅' : '🔒'} {s}
+                <Icon name={s === 'open' ? 'warning' : s === 'answered' ? 'success' : 'file'} size={13} color={statusFilter === s ? 'white' : undefined} />
+                <span>{s}</span>
               </button>
             ))}
             <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--gray-400)' }}>
@@ -179,7 +186,7 @@ export default function TeacherDoubts() {
             <div className="page-loader" style={{ minHeight: 200 }}><div className="spinner" /></div>
           ) : doubts.length === 0 ? (
             <EmptyState
-              icon="❓"
+              icon="doubts"
               title={`No ${statusFilter} doubts`}
               message={statusFilter === 'open'
                 ? 'No pending doubts from students in this class. Check back later!'
@@ -206,8 +213,9 @@ export default function TeacherDoubts() {
                         )}
                         <span className={`badge ${STATUS_COLORS[d.status]}`}>{d.status}</span>
                         {d.subject && (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--gray-500)' }}>
-                            {d.subject.icon} {d.subject.name}
+                          <span style={{ fontSize: '0.72rem', color: 'var(--gray-500)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Icon name="book" size={12} color="var(--gray-400)" />
+                            <span>{d.subject.name}</span>
                           </span>
                         )}
                         {d.type && d.type !== 'general' && (
@@ -223,13 +231,19 @@ export default function TeacherDoubts() {
                         <p style={{ fontSize: '0.82rem', color: 'var(--gray-600)', fontFamily: 'var(--font-devanagari)', marginTop: 4 }}>{d.textHindi}</p>
                       )}
                       {d.concept && (
-                        <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)', marginTop: 4, display: 'block' }}>📚 {d.concept.name}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="book" size={12} color="var(--gray-400)" />
+                          {d.concept.name}
+                        </span>
                       )}
 
                       {/* Answer display */}
                       {d.status === 'answered' && d.answer && (
                         <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--secondary-light)', borderRadius: 8, borderLeft: '3px solid var(--secondary)' }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--secondary-dark)', marginBottom: 4 }}>✅ Your Answer:</div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--secondary-dark)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="academic" size={14} color="var(--secondary-dark)" />
+                            <span>Your Answer:</span>
+                          </div>
                           <p style={{ fontSize: '0.85rem', color: 'var(--secondary-dark)' }}>{d.answer}</p>
                           {d.answerHindi && (
                             <p style={{ fontSize: '0.8rem', color: 'var(--secondary-dark)', fontFamily: 'var(--font-devanagari)', marginTop: 4 }}>{d.answerHindi}</p>
@@ -246,9 +260,10 @@ export default function TeacherDoubts() {
                         {new Date(d.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                       {d.status === 'open' && (
-                        <button className="btn btn-primary btn-sm" style={{ fontSize: '0.75rem' }}
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           onClick={() => { setSelected(d); setAnswer(''); setAnswerHindi(''); setAnswerModal(true); }}>
-                          ✏️ Answer
+                          <Icon name="edit" size={13} color="white" />
+                          Answer
                         </button>
                       )}
                     </div>
@@ -267,8 +282,9 @@ export default function TeacherDoubts() {
           <>
             {/* Student's question */}
             <div style={{ padding: '12px 14px', background: '#FFF8F0', borderRadius: 8, marginBottom: 16, border: '1px solid #F5B82040' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--gray-500)', marginBottom: 4 }}>
-                ❓ {selected.student?.name}'s question:
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--gray-500)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="doubts" size={14} color="var(--primary)" />
+                <span>{selected.student?.name}'s question:</span>
               </div>
               <p style={{ fontSize: '0.875rem', color: 'var(--gray-700)', lineHeight: 1.5 }}>{selected.text}</p>
               {selected.textHindi && (
@@ -292,7 +308,7 @@ export default function TeacherDoubts() {
             <div className="flex gap-3" style={{ justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setAnswerModal(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={handleAnswer} disabled={saving || !answer.trim()}>
-                {saving ? '⏳ Submitting…' : '✓ Submit Answer'}
+                {saving ? 'Submitting…' : 'Submit Answer'}
               </button>
             </div>
           </>

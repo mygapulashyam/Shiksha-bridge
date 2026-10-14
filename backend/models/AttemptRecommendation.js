@@ -59,7 +59,7 @@ const attemptSchema = new mongoose.Schema(
     // State
     status: {
       type: String,
-      enum: ['in_progress', 'completed', 'abandoned'],
+      enum: ['in_progress', 'submitting', 'completed', 'abandoned'],
       default: 'in_progress',
     },
     startedAt: { type: Date, default: Date.now },
@@ -71,6 +71,16 @@ const attemptSchema = new mongoose.Schema(
     recommendationGenerated: { type: Boolean, default: false },
   },
   { timestamps: true }
+);
+
+// Indexes
+attemptSchema.index({ student: 1, quiz: 1, status: 1 });
+attemptSchema.index({ student: 1, status: 1, createdAt: -1 });
+attemptSchema.index({ school: 1, status: 1 });
+// Partial unique index to prevent duplicate in-progress attempts from double-clicks
+attemptSchema.index(
+  { student: 1, quiz: 1 },
+  { unique: true, partialFilterExpression: { status: 'in_progress' } }
 );
 
 // Compute percentage before save
@@ -124,11 +134,15 @@ const recommendationSchema = new mongoose.Schema(
       enum: ['pending', 'in_progress', 'completed', 'skipped'],
       default: 'pending',
     },
+    xpAwarded: { type: Boolean, default: false },
     completedAt: { type: Date },
     school: { type: mongoose.Schema.Types.ObjectId, ref: 'School' },
   },
   { timestamps: true }
 );
+
+recommendationSchema.index({ student: 1, status: 1, priority: 1 });
+recommendationSchema.index({ student: 1, concept: 1 });
 
 /* ─── ProgressReport ─────────────────────────── */
 const progressReportSchema = new mongoose.Schema(

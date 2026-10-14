@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Pagination, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const TYPE_CONFIG = {
-  low_score:        { icon: '⚠️', label: 'Low Score',         color: 'var(--danger)',   bg: '#FFEBEB' },
-  repeated_failure: { icon: '🔴', label: 'Repeated Failure',  color: '#991B1B',         bg: '#FEE2E2' },
-  inactive:         { icon: '💤', label: 'Student Inactive',  color: '#7C3AED',         bg: '#F5F3FF' },
-  class_avg_drop:   { icon: '📉', label: 'Class Avg Dropped', color: 'var(--primary)',  bg: '#FFF3E8' },
-  mastery_achieved: { icon: '🌟', label: 'Mastery Achieved',  color: 'var(--secondary)',bg: 'var(--secondary-light)' },
+  low_score:        { icon: 'warning',    label: 'Low Score',         color: 'var(--danger)',   bg: '#FFEBEB' },
+  repeated_failure: { icon: 'error',      label: 'Repeated Failure',  color: '#991B1B',         bg: '#FEE2E2' },
+  inactive:         { icon: 'clock',      label: 'Student Inactive',  color: '#7C3AED',         bg: '#F5F3FF' },
+  class_avg_drop:   { icon: 'trend-down', label: 'Class Avg Dropped', color: 'var(--primary)',  bg: '#FFF3E8' },
+  mastery_achieved: { icon: 'star',       label: 'Mastery Achieved',  color: 'var(--secondary)',bg: 'var(--secondary-light)' },
 };
 const PRIORITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', low: 'badge-success' };
 
@@ -59,11 +60,17 @@ export default function TeacherAlerts() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="page-title">🔔 Teacher Alerts</h1>
+            <h1 className="page-title flex items-center gap-2">
+              <Icon name="bell" size={26} color="var(--primary)" />
+              <span>Teacher Alerts</span>
+            </h1>
             <p className="page-subtitle">Automatic intervention alerts — {unreadCount} unread</p>
           </div>
           {unreadCount > 0 && (
-            <button className="btn btn-outline btn-sm" onClick={markAllRead}>✓ Mark All Read</button>
+            <button className="btn btn-outline btn-sm" onClick={markAllRead} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="check" size={14} color="currentColor" />
+              <span>Mark All Read</span>
+            </button>
           )}
         </div>
       </div>
@@ -74,17 +81,19 @@ export default function TeacherAlerts() {
       <div className="flex gap-2 mb-4 flex-wrap">
         <button className={`btn btn-sm ${!filter.type && !filter.unread ? 'btn-primary' : 'btn-ghost'}`}
           style={{ border: '1px solid var(--gray-200)' }}
-          onClick={() => setFilter({ type: '', unread: '' })}>🗂 All</button>
+          onClick={() => setFilter({ type: '', unread: '' })}>All</button>
         <button className={`btn btn-sm ${filter.unread === 'true' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ border: '1px solid var(--gray-200)' }}
+          style={{ border: '1px solid var(--gray-200)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           onClick={() => setFilter({ type: '', unread: filter.unread === 'true' ? '' : 'true' })}>
-          🔵 Unread {unreadCount > 0 && `(${unreadCount})`}
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} />
+          <span>Unread {unreadCount > 0 && `(${unreadCount})`}</span>
         </button>
         {Object.entries(TYPE_CONFIG).map(([type, cfg]) => (
           <button key={type} className={`btn btn-sm ${filter.type === type ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ border: '1px solid var(--gray-200)' }}
+            style={{ border: '1px solid var(--gray-200)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             onClick={() => setFilter(p => ({ ...p, type: p.type === type ? '' : type }))}>
-            {cfg.icon} {cfg.label}
+            <Icon name={cfg.icon} size={14} color={filter.type === type ? 'white' : cfg.color} />
+            <span>{cfg.label}</span>
           </button>
         ))}
       </div>
@@ -92,7 +101,7 @@ export default function TeacherAlerts() {
       {loading ? (
         <div className="page-loader"><div className="spinner" /></div>
       ) : alerts.length === 0 ? (
-        <EmptyState icon="✅" title="No alerts" message="Everything looks good! Alerts will appear here when students need attention." />
+        <EmptyState icon="success" title="No alerts" message="Everything looks good! Alerts will appear here when students need attention." />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {alerts.map(a => {
@@ -104,8 +113,8 @@ export default function TeacherAlerts() {
                 border: `2px solid ${a.isRead ? 'var(--gray-200)' : cfg.color + '30'}`,
                 display: 'flex', gap: 14, alignItems: 'flex-start',
               }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                  {cfg.icon}
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: cfg.bg, border: `2px solid ${cfg.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name={cfg.icon} size={20} color={cfg.color} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="flex items-center gap-2 mb-1" style={{ flexWrap: 'wrap' }}>
@@ -115,8 +124,18 @@ export default function TeacherAlerts() {
                   </div>
                   <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', lineHeight: 1.5 }}>{a.message}</p>
                   <div className="flex gap-4 mt-2 items-center" style={{ flexWrap: 'wrap' }}>
-                    {a.student && <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>👤 {a.student.name}</span>}
-                    {a.class && <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>🏫 {a.class.name}</span>}
+                    {a.student && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon name="user" size={13} color="var(--gray-400)" />
+                        <span>{a.student.name}</span>
+                      </span>
+                    )}
+                    {a.class && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon name="class" size={13} color="var(--gray-400)" />
+                        <span>{a.class.name}</span>
+                      </span>
+                    )}
                     <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>
                       {new Date(a.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </span>

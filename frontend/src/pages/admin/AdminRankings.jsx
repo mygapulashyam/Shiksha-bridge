@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Layout from '../../components/common/Layout';
-import { PageLoader, Alert, SectionHeader, StatCard } from '../../components/common/UI';
+import { PageLoader, Alert, SectionHeader, StatCard, EmptyState } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 export default function AdminRankings() {
@@ -30,13 +31,16 @@ export default function AdminRankings() {
   const chartData = (data?.ranked || []).slice(0, 10).map(s => ({
     name: s.school?.name?.slice(0, 14) || 'School',
     avgScore: s.avgScore,
-    activeStudents: s.activeStudents,
+    students: s.activeStudents,
   }));
 
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">🏆 District Rankings</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="rankings" size={26} color="var(--primary)" />
+          <span>District Rankings</span>
+        </h1>
         <p className="page-subtitle">School performance rankings across districts and states</p>
       </div>
 
@@ -52,14 +56,17 @@ export default function AdminRankings() {
           <label className="form-label">District</label>
           <input className="form-input" style={{ width: 180 }} value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} placeholder="e.g. Nagpur" />
         </div>
-        <button className="btn btn-primary btn-sm" onClick={fetchRankings}>🔍 Search</button>
+        <button className="btn btn-primary btn-sm" onClick={fetchRankings} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="search" size={14} color="white" />
+          <span>Search</span>
+        </button>
         <button className="btn btn-ghost btn-sm" onClick={() => { setStateFilter(''); setDistrictFilter(''); setTimeout(fetchRankings, 50); }}>Clear</button>
       </div>
 
       <div className="stats-grid mb-6">
-        <StatCard label="Schools Ranked" value={data?.totalSchools || 0} icon="🏫" color="var(--primary)" />
-        <StatCard label="Top School" value={data?.ranked?.[0]?.school?.name?.slice(0, 20) || '—'} icon="🥇" color="var(--accent-dark)" />
-        <StatCard label="Top Score" value={data?.ranked?.[0] ? `${data.ranked[0].avgScore}%` : '—'} icon="⭐" color="var(--secondary)" />
+        <StatCard label="Schools Ranked" value={data?.totalSchools || 0} icon="school" color="var(--primary)" />
+        <StatCard label="Top School" value={data?.ranked?.[0]?.school?.name?.slice(0, 20) || '—'} icon="trophy" color="var(--accent-dark)" />
+        <StatCard label="Top Score" value={data?.ranked?.[0] ? `${data.ranked[0].avgScore}%` : '—'} icon="star" color="var(--secondary)" />
       </div>
 
       <div className="grid-2 gap-4 mb-6">
@@ -77,22 +84,22 @@ export default function AdminRankings() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">📊</div>
-              <p>No data available</p>
-            </div>
+            <EmptyState icon="chart" title="No data available" message="No ranking data found for the current filter." />
           )}
         </div>
 
         {/* Weakest Subjects */}
         <div className="card">
-          <SectionHeader title="⚠️ Weakest Subjects District-wide" subtitle="Subjects needing most attention" />
+          <SectionHeader title="Weakest Subjects District-wide" subtitle="Subjects needing most attention" />
           {data?.weakSubjects?.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {data.weakSubjects.map((s, i) => (
                 <div key={i}>
                   <div className="flex items-center justify-between mb-1">
-                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{s.subjectIcon} {s.subjectName}</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="book" size={14} color="var(--primary)" />
+                      {s.subjectName}
+                    </span>
                     <span style={{ fontWeight: 700, color: s.avgScore < 40 ? 'var(--danger)' : 'var(--accent-dark)', fontSize: '0.875rem' }}>
                       {s.avgScore}%
                     </span>
@@ -105,16 +112,14 @@ export default function AdminRankings() {
               ))}
             </div>
           ) : (
-            <div className="empty-state" style={{ padding: 32 }}>
-              <p>No subject data available</p>
-            </div>
+            <EmptyState icon="book" title="No subject data" message="No weak subjects reported yet." />
           )}
         </div>
       </div>
 
       {/* Full Rankings Table */}
       <div className="card">
-        <SectionHeader title="📋 Full School Rankings" subtitle={`${data?.totalSchools || 0} schools`} />
+        <SectionHeader title="Full School Rankings" subtitle={`${data?.totalSchools || 0} schools`} />
         <div className="table-wrapper">
           <table className="table">
             <thead>
@@ -138,7 +143,7 @@ export default function AdminRankings() {
                   <tr key={s.rank}>
                     <td>
                       <span style={{ fontWeight: 800, color: s.rank <= 3 ? 'var(--accent-dark)' : 'var(--gray-500)' }}>
-                        {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : `#${s.rank}`}
+                        #{s.rank}
                       </span>
                     </td>
                     <td style={{ fontWeight: 600 }}>{s.school?.name || '—'}</td>
@@ -153,8 +158,9 @@ export default function AdminRankings() {
                       {s.avgScore}%
                     </td>
                     <td>
-                      <span className={`badge ${s.avgScore >= 70 ? 'badge-success' : s.avgScore >= 40 ? 'badge-warning' : 'badge-danger'}`}>
-                        {s.avgScore >= 70 ? '✅ Proficient' : s.avgScore >= 40 ? '📈 Developing' : '⚠️ Needs Support'}
+                      <span className={`badge ${s.avgScore >= 70 ? 'badge-success' : s.avgScore >= 40 ? 'badge-warning' : 'badge-danger'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Icon name={s.avgScore >= 70 ? 'success' : s.avgScore >= 40 ? 'trend-up' : 'warning'} size={12} color="currentColor" />
+                        {s.avgScore >= 70 ? 'Proficient' : s.avgScore >= 40 ? 'Developing' : 'Needs Support'}
                       </span>
                     </td>
                   </tr>

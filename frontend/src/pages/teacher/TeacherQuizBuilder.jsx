@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
-import { Alert, Modal } from '../../components/common/UI';
+import { Alert, Modal, EmptyState } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const BLANK_Q = { text: '', textHindi: '', type: 'mcq', difficulty: 'basic', marks: 1, explanation: '', concept: '',
@@ -141,6 +142,23 @@ export default function TeacherQuizBuilder() {
     finally { setSaving(false); }
   };
 
+  const handleTypeChange = (newType) => {
+    setQForm(prev => {
+      let options = prev.options;
+      if (newType === 'truefalse') {
+        options = [
+          { label: 'True', text: 'True', isCorrect: true },
+          { label: 'False', text: 'False', isCorrect: false }
+        ];
+      } else if (newType === 'mcq') {
+        options = (prev.options && prev.options.length >= 2) ? prev.options : BLANK_Q.options;
+      } else if (newType === 'fillblank') {
+        options = [];
+      }
+      return { ...prev, type: newType, options };
+    });
+  };
+
   const publishQuiz = async () => {
     if (!savedQuizId) { setError('Save the quiz first'); return; }
     if (questions.length === 0) { setError('Add at least one question before publishing'); return; }
@@ -149,7 +167,14 @@ export default function TeacherQuizBuilder() {
       await api.patch(`/teacher/quizzes/${savedQuizId}/publish`);
       setSuccess('Quiz published successfully! Students can now attempt it.');
       setTimeout(() => navigate('/teacher/quizzes'), 1200);
-    } catch (err) { setError(err.response?.data?.message || 'Publish failed'); }
+    } catch (err) {
+      const errorData = err.response?.data;
+      if (errorData?.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+        setError(`${errorData.message || 'Validation failed'}: ${errorData.errors.join('; ')}`);
+      } else {
+        setError(errorData?.message || 'Publish failed');
+      }
+    }
     finally { setPublishing(false); }
   };
 
@@ -166,8 +191,9 @@ export default function TeacherQuizBuilder() {
           <div className="flex gap-2">
             <button className="btn btn-outline" onClick={() => navigate('/teacher/quizzes')}>← Back</button>
             {savedQuizId && questions.length > 0 && (
-              <button className="btn btn-secondary" onClick={publishQuiz} disabled={publishing}>
-                {publishing ? '⏳ Publishing…' : '🚀 Publish Quiz'}
+              <button className="btn btn-secondary" onClick={publishQuiz} disabled={publishing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="rocket" size={16} color="white" />
+                <span>{publishing ? 'Publishing…' : 'Publish Quiz'}</span>
               </button>
             )}
           </div>
@@ -180,7 +206,10 @@ export default function TeacherQuizBuilder() {
       <div className="grid-2 gap-4">
         {/* Quiz Config */}
         <div className="card">
-          <h3 style={{ fontWeight: 700, marginBottom: 20, color: 'var(--gray-900)' }}>📋 Quiz Details</h3>
+          <h3 style={{ fontWeight: 700, marginBottom: 20, color: 'var(--gray-900)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="clipboard" size={20} color="var(--primary)" />
+            <span>Quiz Details</span>
+          </h3>
           <div className="form-group">
             <label className="form-label">Quiz Title *</label>
             <input className="form-input" value={quiz.title} onChange={ZF('title')} placeholder="Fractions Diagnostic – Class 7" />
@@ -232,30 +261,27 @@ export default function TeacherQuizBuilder() {
             </div>
           </div>
           <button className="btn btn-primary btn-full" onClick={saveQuiz} disabled={saving} style={{ marginTop: 8 }}>
-            {saving ? '⏳ Saving…' : savedQuizId ? '✓ Update Quiz Details' : '✓ Save Quiz & Add Questions'}
+            {saving ? 'Saving…' : savedQuizId ? 'Update Quiz Details' : 'Save Quiz & Add Questions'}
           </button>
         </div>
 
         {/* Questions Panel */}
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h3 style={{ fontWeight: 700, color: 'var(--gray-900)' }}>❓ Questions ({questions.length})</h3>
+            <h3 style={{ fontWeight: 700, color: 'var(--gray-900)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="question" size={20} color="var(--primary)" />
+              <span>Questions ({questions.length})</span>
+            </h3>
             {savedQuizId && (
               <button className="btn btn-primary btn-sm" onClick={() => setQModal(true)}>+ Add Question</button>
             )}
           </div>
 
           {!savedQuizId ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">💡</div>
-              <p className="text-muted">Save the quiz details first, then add questions here.</p>
-            </div>
+            <EmptyState icon="bulb" title="Save details first" message="Save the quiz details on the left first, then add questions here." />
           ) : questions.length === 0 ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">➕</div>
-              <p className="text-muted">No questions yet. Add your first question!</p>
-              <button className="btn btn-primary btn-sm mt-4" onClick={() => setQModal(true)}>+ Add First Question</button>
-            </div>
+            <EmptyState icon="plus" title="No questions yet" message="Add your first question to build this quiz!"
+              action={<button className="btn btn-primary btn-sm mt-3" onClick={() => setQModal(true)}>+ Add First Question</button>} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {questions.map((q, i) => (
@@ -265,8 +291,13 @@ export default function TeacherQuizBuilder() {
                     <div className="flex gap-2 items-center">
                       <span className="badge badge-gray" style={{ textTransform: 'uppercase', fontSize: '0.68rem' }}>{q.type}</span>
                       <span className="badge" style={{ background: DIFF_COLORS[q.difficulty] + '20', color: DIFF_COLORS[q.difficulty], fontSize: '0.68rem' }}>{q.difficulty}</span>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '2px 6px', fontSize: '0.75rem', height: 'auto' }} onClick={() => startEditQuestion(q)}>✏️ Edit</button>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '2px 6px', fontSize: '0.75rem', height: 'auto', color: 'var(--danger)' }} onClick={() => deleteQuestion(q._id)}>🗑️</button>
+                      <button className="btn btn-ghost btn-sm" style={{ padding: '2px 6px', fontSize: '0.75rem', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => startEditQuestion(q)}>
+                        <Icon name="edit" size={12} color="currentColor" />
+                        <span>Edit</span>
+                      </button>
+                      <button className="btn btn-ghost btn-sm" style={{ padding: '2px 6px', fontSize: '0.75rem', height: 'auto', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }} onClick={() => deleteQuestion(q._id)}>
+                        <Icon name="trash" size={13} color="var(--danger)" />
+                      </button>
                     </div>
                   </div>
                   <p style={{ fontSize: '0.9rem', fontWeight: 500 }}>{q.text}</p>
@@ -292,8 +323,9 @@ export default function TeacherQuizBuilder() {
 
           {savedQuizId && questions.length > 0 && (
             <div style={{ marginTop: 20, padding: '14px', background: 'var(--primary-light)', borderRadius: 10, border: '1px solid rgba(232,101,10,0.2)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--primary-dark)', fontSize: '0.9rem' }}>
-                📊 Total: {questions.length} questions · {questions.reduce((a, q) => a + (q.marks || 1), 0)} marks
+              <div style={{ fontWeight: 700, color: 'var(--primary-dark)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="chart" size={16} color="var(--primary-dark)" />
+                <span>Total: {questions.length} questions · {questions.reduce((a, q) => a + (q.marks || 1), 0)} marks</span>
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: 4 }}>
                 Ready to publish! Click "Publish Quiz" to make it available to students.
@@ -304,7 +336,7 @@ export default function TeacherQuizBuilder() {
       </div>
 
       {/* Add Question Modal */}
-      <Modal open={qModal} onClose={() => { setQModal(false); setQForm(BLANK_Q); setEditingQuestionId(null); }} title={editingQuestionId ? "✏️ Edit Question" : "Add Question"} size="lg">
+      <Modal open={qModal} onClose={() => { setQModal(false); setQForm(BLANK_Q); setEditingQuestionId(null); }} title={editingQuestionId ? "Edit Question" : "Add Question"} size="lg">
         <form onSubmit={saveQuestion}>
           <div className="form-group">
             <label className="form-label">Question Text (English) *</label>
@@ -317,7 +349,7 @@ export default function TeacherQuizBuilder() {
           <div className="grid-2 gap-3">
             <div className="form-group">
               <label className="form-label">Question Type</label>
-              <select className="form-input form-select" value={qForm.type} onChange={QF('type')}>
+              <select className="form-input form-select" value={qForm.type} onChange={e => handleTypeChange(e.target.value)}>
                 <option value="mcq">Multiple Choice (MCQ)</option>
                 <option value="truefalse">True / False</option>
                 <option value="fillblank">Fill in the Blank</option>
@@ -394,7 +426,7 @@ export default function TeacherQuizBuilder() {
           <div className="flex gap-3" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
             <button type="button" className="btn btn-ghost" onClick={() => { setQModal(false); setQForm(BLANK_Q); setEditingQuestionId(null); }}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '⏳ Saving…' : editingQuestionId ? '✓ Save Changes' : '+ Add Question'}
+              {saving ? 'Saving…' : editingQuestionId ? 'Save Changes' : '+ Add Question'}
             </button>
           </div>
         </form>

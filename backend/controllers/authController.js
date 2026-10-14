@@ -60,19 +60,17 @@ const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = email.toLowerCase().trim();
   const user = await User.findOne({ email: normalizedEmail }).select('+password +loginAttempts +lockUntil +refreshTokens').populate('school', 'name district state');
-  if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+  if (!user.isActive) return res.status(403).json({ success: false, message: 'Account deactivated. Please contact administrator.' });
   if (user.isLocked) {
     const minsLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
-    return res.status(423).json({ success: false, message: `Account locked. Try again in ${minsLeft} min.` });
+    return res.status(423).json({ success: false, message: `Account temporarily locked due to multiple failed attempts. Try again in ${minsLeft} min.` });
   }
   const isMatch = await user.matchPassword(password);
   if (!isMatch) {
     await user.incrementLoginAttempts();
-    const MAX = parseInt(process.env.MAX_LOGIN_ATTEMPTS) || 5;
-    const remaining = MAX - (user.loginAttempts + 1);
-    return res.status(401).json({ success: false, message: remaining > 0 ? `Invalid credentials. ${remaining} attempt(s) left before lock.` : 'Account locked.' });
+    return res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
-  if (!user.isActive) return res.status(403).json({ success: false, message: 'Account deactivated.' });
   await user.updateOne({ $set: { loginAttempts: 0 }, $unset: { lockUntil: 1 } });
   user.lastLogin = new Date();
   const token = user.getSignedJWT();
@@ -184,12 +182,13 @@ const forgotPassword = asyncHandler(async (req, res) => {
     return res.status(200).json({ success: true, message: successMsg });
   }
 
-  const otp = crypto.randomInt(100000, 999999).toString();
+  // randomInt min (inclusive) to max (exclusive), so use 1000000 to include 999999
+  const otp = crypto.randomInt(100000, 1000000).toString();
   const hashedOtp = hashToken(otp);
 
-  user.passwordResetToken = hashedOtp;
-  user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
-  user.passwordResetAttempts = 0;
+  user.passwordResetOTP = hashedOtp;
+  user.passwordResetOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+  user.passwordResetOTPAttempts = 0;
 
   await user.save({ validateBeforeSave: false });
 
@@ -221,49 +220,51 @@ const verifyOTP = asyncHandler(async (req, res) => {
 
   const normalizedEmail = email.toLowerCase().trim();
 
-  // Atomic increment attempt counter on the active reset request to prevent race conditions
+  // Atomically increment attempt counter on the active OTP request
   const user = await User.findOneAndUpdate(
     {
       email: normalizedEmail,
-      passwordResetToken: { $exists: true, $ne: null },
-      passwordResetExpires: { $gt: new Date() },
+      passwordResetOTP: { $exists: true, $ne: null },
+      passwordResetOTPExpires: { $gt: new Date() },
     },
-    { $inc: { passwordResetAttempts: 1 } },
+    { $inc: { passwordResetOTPAttempts: 1 } },
     { new: true }
-  ).select('+passwordResetToken +passwordResetExpires +passwordResetAttempts');
+  ).select('+passwordResetOTP +passwordResetOTPExpires +passwordResetOTPAttempts');
 
   if (!user) {
     return res.status(400).json({ success: false, message: 'Invalid email or verification request expired. Please request a new OTP.' });
   }
 
-  if (user.passwordResetAttempts > 5) {
+  if (user.passwordResetOTPAttempts > 5) {
     await User.findByIdAndUpdate(user._id, {
-      $unset: { passwordResetToken: 1, passwordResetExpires: 1 },
-      $set: { passwordResetAttempts: 0 },
+      $unset: { passwordResetOTP: 1, passwordResetOTPExpires: 1 },
+      $set: { passwordResetOTPAttempts: 0 },
     });
     return res.status(429).json({ success: false, message: 'Too many incorrect OTP attempts. The OTP has been invalidated. Please request a new OTP.' });
   }
 
   const hashedOtpInput = hashToken(otp.trim());
-  if (user.passwordResetToken !== hashedOtpInput) {
-    const remaining = Math.max(0, 5 - user.passwordResetAttempts);
+  if (user.passwordResetOTP !== hashedOtpInput) {
+    const remaining = Math.max(0, 5 - user.passwordResetOTPAttempts);
     if (remaining === 0) {
       await User.findByIdAndUpdate(user._id, {
-        $unset: { passwordResetToken: 1, passwordResetExpires: 1 },
-        $set: { passwordResetAttempts: 0 },
+        $unset: { passwordResetOTP: 1, passwordResetOTPExpires: 1 },
+        $set: { passwordResetOTPAttempts: 0 },
       });
       return res.status(400).json({ success: false, message: 'Too many incorrect attempts. Please request a new OTP.' });
     }
     return res.status(400).json({ success: false, message: `Incorrect verification code. ${remaining} attempt(s) remaining before block.` });
   }
 
-  // Success! Generate single-use reset token
+  // Success! Invalidate OTP and generate separate single-use reset token
   const resetToken = crypto.randomBytes(32).toString('hex');
   const hashedResetToken = hashToken(resetToken);
 
+  user.passwordResetOTP = undefined;
+  user.passwordResetOTPExpires = undefined;
+  user.passwordResetOTPAttempts = 0;
   user.passwordResetToken = hashedResetToken;
-  user.passwordResetExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-  user.passwordResetAttempts = 0;
+  user.passwordResetTokenExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
   await user.save({ validateBeforeSave: false });
 
   res.status(200).json({
@@ -274,7 +275,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { email, token, newPassword } = req.body;
   if (!token || !newPassword) {
     return res.status(400).json({ success: false, message: 'Reset token and new password are required.' });
   }
@@ -284,10 +285,16 @@ const resetPassword = asyncHandler(async (req, res) => {
 
   const hashedToken = hashToken(token.trim());
 
-  const user = await User.findOne({
+  // Require matching email if provided or validate token
+  const query = {
     passwordResetToken: hashedToken,
-    passwordResetExpires: { $gt: Date.now() },
-  });
+    passwordResetTokenExpires: { $gt: Date.now() },
+  };
+  if (email) {
+    query.email = email.toLowerCase().trim();
+  }
+
+  const user = await User.findOne(query);
 
   if (!user) {
     return res.status(400).json({ success: false, message: 'Invalid or expired password reset token. Please verify your OTP again.' });
@@ -295,8 +302,10 @@ const resetPassword = asyncHandler(async (req, res) => {
 
   user.password = newPassword;
   user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  user.passwordResetAttempts = 0;
+  user.passwordResetTokenExpires = undefined;
+  user.passwordResetOTP = undefined;
+  user.passwordResetOTPExpires = undefined;
+  user.passwordResetOTPAttempts = 0;
   // Clear any existing account lock
   user.loginAttempts = 0;
   user.lockUntil = undefined;

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Layout from '../../components/common/Layout';
-import { StatCard, PageLoader, Alert, SectionHeader, MasteryBadge } from '../../components/common/UI';
+import { StatCard, PageLoader, Alert, SectionHeader, MasteryBadge, EmptyState } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 
@@ -77,7 +78,7 @@ export default function TeacherDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">Teacher Dashboard</h1>
-            <p className="page-subtitle">Welcome back, {user?.name?.split(' ')[0]} 👋 — here's how your classes are doing</p>
+            <p className="page-subtitle">Welcome back, {user?.name?.split(' ')[0]} — here's how your classes are doing</p>
           </div>
           <Link to="/teacher/quizzes/new" className="btn btn-primary">+ Create Quiz</Link>
         </div>
@@ -95,7 +96,9 @@ export default function TeacherDashboard() {
           textAlign: 'center',
           marginBottom: 24,
         }}>
-          <div style={{ fontSize: '4rem', marginBottom: 16 }}>🎒</div>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <Icon name="backpack" size={32} color="var(--primary)" />
+          </div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--gray-700)', marginBottom: 8 }}>
             No Classes Assigned Yet
           </h2>
@@ -103,7 +106,10 @@ export default function TeacherDashboard() {
             You haven't been assigned to any classes. Please contact your school administrator to get assigned to your classes.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/teacher/quizzes" className="btn btn-outline">📝 My Quizzes</Link>
+            <Link to="/teacher/quizzes" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="quiz" size={14} color="currentColor" />
+              <span>My Quizzes</span>
+            </Link>
             <Link to="/teacher/quizzes/new" className="btn btn-primary">+ Create Quiz</Link>
           </div>
         </div>
@@ -235,10 +241,7 @@ export default function TeacherDashboard() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="empty-state" style={{ padding: 40 }}>
-                      <div className="empty-state-icon">📊</div>
-                      <p>No quiz data yet for this class</p>
-                    </div>
+                    <EmptyState icon="chart" title="No quiz data" message="No quiz data yet for this class" />
                   )}
                 </div>
 
@@ -247,10 +250,7 @@ export default function TeacherDashboard() {
                   <SectionHeader title="Weak Concepts" subtitle="Concepts where most students struggle"
                     action={selectedClass && <Link to={`/teacher/class/${selectedClass._id}`} className="btn btn-ghost btn-sm">View All →</Link>} />
                   {weakConcepts.length === 0 ? (
-                    <div className="empty-state" style={{ padding: 40 }}>
-                      <div className="empty-state-icon">🎉</div>
-                      <p>No weak concepts identified yet</p>
-                    </div>
+                    <EmptyState icon="success" title="No weak concepts" message="No weak concepts identified yet" />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {weakConcepts.slice(0, 6).map((c, i) => (
@@ -262,8 +262,9 @@ export default function TeacherDashboard() {
                           <div className="progress-bar">
                             <div className="progress-fill" style={{ width: `${c.avgScore}%`, background: 'var(--danger)' }} />
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 3 }}>
-                            ⚠️ {c.weakStudents} students below 40% · {c.chapter || 'No chapter'}
+                          <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 3, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Icon name="warning" size={12} color="var(--danger)" />
+                            <span>{c.weakStudents} students below 40% · {c.chapter || 'No chapter'}</span>
                           </div>
                         </div>
                       ))}
@@ -280,10 +281,7 @@ export default function TeacherDashboard() {
                   action={selectedClass && <Link to={`/teacher/class/${selectedClass._id}`} className="btn btn-outline btn-sm">Full Class View →</Link>}
                 />
                 {!classData || classData.length === 0 ? (
-                  <div className="empty-state" style={{ padding: 40 }}>
-                    <div className="empty-state-icon">👥</div>
-                    <p>No students in this class yet, or no quiz attempts recorded.</p>
-                  </div>
+                  <EmptyState icon="users" title="No students found" message="No students in this class yet, or no quiz attempts recorded." />
                 ) : (
                   <div className="table-wrapper">
                     <table className="table">
@@ -312,7 +310,14 @@ export default function TeacherDashboard() {
                               {s.avgScore !== null ? `${s.avgScore}%` : 'N/A'}
                             </td>
                             <td>{s.totalAttempts}</td>
-                            <td>{s.streak > 0 ? `🔥 ${s.streak}` : '—'}</td>
+                            <td>
+                              {s.streak > 0 ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <Icon name="flame" size={13} color="var(--primary)" />
+                                  <span>{s.streak}</span>
+                                </span>
+                              ) : '—'}
+                            </td>
                             <td><MasteryBadge level={s.status === 'not_started' ? 'not_started' : s.status} /></td>
                             <td>
                               <Link to={`/teacher/students/${s._id}`} className="btn btn-ghost btn-sm" style={{ fontSize: '0.75rem' }}>Detail →</Link>
@@ -334,10 +339,8 @@ export default function TeacherDashboard() {
         <div className="card" style={{ marginTop: 0 }}>
           <SectionHeader title="Recent Quizzes" subtitle="Your quiz activity" />
           {quizzes.length === 0 ? (
-            <div className="empty-state" style={{ padding: 30 }}>
-              <div className="empty-state-icon">📝</div>
-              <p>No quizzes yet. <Link to="/teacher/quizzes/new">Create your first quiz →</Link></p>
-            </div>
+            <EmptyState icon="quiz" title="No quizzes yet" message="Create your first quiz to assign to students."
+              action={<Link to="/teacher/quizzes/new" className="btn btn-primary btn-sm mt-3">+ Create Quiz</Link>} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {quizzes.map(q => (

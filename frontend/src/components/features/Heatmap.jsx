@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
+import Icon, { getIconNameForEmoji } from '../common/Icon';
 
 const MASTERY_CONFIG = {
   mastered:    { label: 'Mastered',    bg: '#dcfce7', text: '#166534', border: '#86efac' },
@@ -41,7 +42,9 @@ export function StudentHeatmap({ studentId, compact = false }) {
   if (loading) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--gray-400)' }}>Loading heatmap…</div>;
   if (!data.length) return (
     <div style={{ textAlign: 'center', padding: 32, color: 'var(--gray-400)' }}>
-      <div style={{ fontSize: '2rem', marginBottom: 8 }}>🗺️</div>
+      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', background: 'var(--gray-100)', marginBottom: 8 }}>
+        <Icon name="map" size={24} color="var(--gray-500)" />
+      </div>
       <p>No concept data yet. Complete a quiz to see your heatmap.</p>
     </div>
   );
@@ -60,54 +63,64 @@ export function StudentHeatmap({ studentId, compact = false }) {
         <div className="flex gap-2 flex-wrap mb-4">
           <button className={`btn btn-sm ${!subjectFilter ? 'btn-primary' : 'btn-ghost'}`}
             style={{ border: '1px solid var(--gray-200)' }} onClick={() => setSubjectFilter('')}>All</button>
-          {subjects.map(s => (
-            <button key={s._id} className={`btn btn-sm ${subjectFilter === s._id ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ border: '1px solid var(--gray-200)' }} onClick={() => setSubjectFilter(s._id)}>
-              {s.icon} {s.name}
-            </button>
-          ))}
+          {subjects.map(s => {
+            const iconName = getIconNameForEmoji(s.icon) || 'book';
+            return (
+              <button key={s._id} className={`btn btn-sm ${subjectFilter === s._id ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ border: '1px solid var(--gray-200)', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setSubjectFilter(s._id)}>
+                <Icon name={iconName} size={14} color={subjectFilter === s._id ? 'white' : 'currentColor'} />
+                <span>{s.name}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {Object.entries(grouped).map(([subjectName, group]) => (
-        <div key={subjectName} style={{ marginBottom: 20 }}>
-          {!compact && (
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--gray-700)', marginBottom: 8 }}>
-              {group.icon} {subjectName}
+      {Object.entries(grouped).map(([subjectName, group]) => {
+        const groupIconName = getIconNameForEmoji(group.icon) || 'book';
+        return (
+          <div key={subjectName} style={{ marginBottom: 20 }}>
+            {!compact && (
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--gray-700)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name={groupIconName} size={16} color="var(--primary)" />
+                <span>{subjectName}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {group.items.map((item) => {
+                const cfg = getColor(item.percentage);
+                return (
+                  <div key={item.conceptId} title={`${item.conceptName}: ${item.percentage}% (${item.attempts} attempts)`}
+                    style={{
+                      padding: compact ? '4px 8px' : '6px 12px',
+                      borderRadius: 8,
+                      background: cfg.bg,
+                      border: `1.5px solid ${cfg.border}`,
+                      color: cfg.text,
+                      fontSize: compact ? '0.72rem' : '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'default',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      transition: 'transform 0.1s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = ''}>
+                    <Icon
+                      name={item.percentage >= 70 ? 'check' : item.percentage >= 40 ? 'trend-up' : 'warning'}
+                      size={12}
+                      color={cfg.text}
+                    />
+                    {item.conceptName?.slice(0, compact ? 16 : 22)}
+                    {!compact && <span style={{ opacity: 0.7, marginLeft: 2 }}>{item.percentage}%</span>}
+                  </div>
+                );
+              })}
             </div>
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {group.items.map((item) => {
-              const cfg = getColor(item.percentage);
-              return (
-                <div key={item.conceptId} title={`${item.conceptName}: ${item.percentage}% (${item.attempts} attempts)`}
-                  style={{
-                    padding: compact ? '4px 8px' : '6px 12px',
-                    borderRadius: 8,
-                    background: cfg.bg,
-                    border: `1.5px solid ${cfg.border}`,
-                    color: cfg.text,
-                    fontSize: compact ? '0.72rem' : '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    transition: 'transform 0.1s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = ''}>
-                  <span style={{ fontSize: '0.7rem' }}>
-                    {item.percentage >= 70 ? '✅' : item.percentage >= 40 ? '📈' : '⚠️'}
-                  </span>
-                  {item.conceptName?.slice(0, compact ? 16 : 22)}
-                  {!compact && <span style={{ opacity: 0.7, marginLeft: 2 }}>{item.percentage}%</span>}
-                </div>
-              );
-            })}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Legend */}
       {!compact && (
@@ -141,7 +154,9 @@ export function ClassHeatmap({ classId }) {
   if (loading) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--gray-400)' }}>Loading class heatmap…</div>;
   if (!data.length) return (
     <div style={{ textAlign: 'center', padding: 32, color: 'var(--gray-400)' }}>
-      <div style={{ fontSize: '2rem', marginBottom: 8 }}>🗺️</div>
+      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', background: 'var(--gray-100)', marginBottom: 8 }}>
+        <Icon name="map" size={24} color="var(--gray-500)" />
+      </div>
       <p>No class data yet. Students need to attempt quizzes first.</p>
     </div>
   );
@@ -163,12 +178,18 @@ export function ClassHeatmap({ classId }) {
         {sorted.map(item => {
           const cfg = getColor(item.avgScore);
           const weakPct = totalStudents > 0 ? Math.round((item.weakCount / totalStudents) * 100) : 0;
+          const subIcon = getIconNameForEmoji(item.subject?.icon) || 'book';
           return (
             <div key={item.conceptId} style={{ padding: '10px 14px', borderRadius: 10, background: cfg.bg, border: `1.5px solid ${cfg.border}` }}>
               <div className="flex items-center justify-between">
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.875rem', color: cfg.text }}>{item.conceptName}</div>
-                  {item.chapter && <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>{item.subject?.icon} {item.chapter}</div>}
+                  {item.chapter && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Icon name={subIcon} size={12} color="var(--gray-400)" />
+                      <span>{item.chapter}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-4 items-center" style={{ flexShrink: 0 }}>
                   <div style={{ textAlign: 'center' }}>
@@ -177,13 +198,19 @@ export function ClassHeatmap({ classId }) {
                   </div>
                   {item.weakCount > 0 && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--danger)' }}>⚠️ {item.weakCount}</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <Icon name="warning" size={13} color="var(--danger)" />
+                        <span>{item.weakCount}</span>
+                      </div>
                       <div style={{ fontSize: '0.65rem', color: 'var(--gray-500)' }}>weak ({weakPct}%)</div>
                     </div>
                   )}
                   {item.masteredCount > 0 && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--secondary)' }}>✅ {item.masteredCount}</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--secondary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <Icon name="check" size={13} color="var(--secondary)" />
+                        <span>{item.masteredCount}</span>
+                      </div>
                       <div style={{ fontSize: '0.65rem', color: 'var(--gray-500)' }}>mastered</div>
                     </div>
                   )}
@@ -202,3 +229,4 @@ export function ClassHeatmap({ classId }) {
     </div>
   );
 }
+

@@ -9,7 +9,7 @@ const {
   getAlerts, markAlertRead, dismissAlert, markAllAlertsRead, triggerScheduledAlerts,
   getStudentHeatmap, getClassHeatmap,
   getClassDoubts, answerDoubt,
-  createResource, getResources, approveResource, rejectResource,
+  createResource, getResources, getResourceById, approveResource, rejectResource,
   importCSV, getCSVTemplateDownload,
   getImprovementTracking,
   getDistrictRankings,
@@ -39,6 +39,7 @@ router.patch('/doubts/:id/answer', protect, authorize('teacher', 'admin'), answe
 // Content Resource Library
 router.post('/resources', protect, authorize('teacher', 'admin'), createResource);
 router.get('/resources', protect, getResources);
+router.get('/resources/:id', protect, getResourceById);
 router.patch('/resources/:id/approve', protect, authorize('teacher', 'admin'), approveResource);
 router.patch('/resources/:id/reject', protect, authorize('teacher', 'admin'), rejectResource);
 

@@ -24,6 +24,7 @@ const learningPathSchema = new mongoose.Schema(
         status: { type: String, enum: ['locked', 'available', 'in_progress', 'completed'], default: 'available' },
         completedAt: { type: Date },
         xpReward: { type: Number, default: 20 },
+        xpAwarded: { type: Boolean, default: false },
       },
     ],
     currentStep: { type: Number, default: 0 },
@@ -72,7 +73,7 @@ const contentResourceSchema = new mongoose.Schema(
       enum: ['note', 'video', 'worksheet', 'example', 'step_solution', 'practice_set'],
       required: true,
     },
-    concept: { type: mongoose.Schema.Types.ObjectId, ref: 'Concept', required: true },
+    concept: { type: mongoose.Schema.Types.ObjectId, ref: 'Concept' },
     subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' },
     grade: { type: Number, min: 6, max: 10 },
     difficulty: { type: String, enum: ['foundational', 'basic', 'intermediate', 'advanced'], default: 'basic' },
@@ -94,6 +95,16 @@ const contentResourceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+learningPathSchema.index({ student: 1, status: 1 });
+learningPathSchema.index({ student: 1, concept: 1 });
+
+doubtSchema.index({ class: 1, status: 1, createdAt: -1 });
+doubtSchema.index({ student: 1, createdAt: -1 });
+doubtSchema.index({ school: 1 });
+
+contentResourceSchema.index({ concept: 1, isActive: 1, isApproved: 1 });
+contentResourceSchema.index({ school: 1, isActive: 1, isApproved: 1 });
 
 module.exports = {
   LearningPath: mongoose.model('LearningPath', learningPathSchema),
