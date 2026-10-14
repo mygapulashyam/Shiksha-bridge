@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8650A" />
+      <stop offset="50%" stop-color="#F5B820" />
+      <stop offset="100%" stop-color="#1B7A4E" />
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#F5B820" />
+      <stop offset="100%" stop-color="#FFF2A3" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Rounded Base Background -->
+  <rect width="64" height="64" rx="14" fill="#1C1814" />
+  
+  <!-- Radiant Dawn Rays -->
+  <path d="M32 9 L32 15 M21 14 L24 19 M43 14 L40 19 M13 24 L18 26 M51 24 L46 26" stroke="#F5B820" stroke-width="2" stroke-linecap="round" opacity="0.85" />
+  
+  <!-- Rising Sun -->
+  <circle cx="32" cy="28" r="9" fill="url(#sunGrad)" />
+  
+  <!-- Open Book Wings -->
+  <!-- Left Page -->
+  <path d="M32 46 C24 43 16 45 12 47 L12 29 C16 27 24 25 32 30 Z" fill="#E8650A" />
+  <path d="M32 46 C25 43.5 18 45 14 47 L14 31 C18 29.5 25 28 32 32 Z" fill="#FFA726" opacity="0.3" />
+  
+  <!-- Right Page -->
+  <path d="M32 46 C40 43 48 45 52 47 L52 29 C48 27 40 25 32 30 Z" fill="#F5B820" />
+  <path d="M32 46 C39 43.5 46 45 50 47 L50 31 C46 29.5 39 28 32 32 Z" fill="#FFF2A3" opacity="0.3" />
+  
+  <!-- Bridging Arch -->
+  <path d="M20 48 Q32 34 44 48 L41 51 Q32 39 23 51 Z" fill="#FFFFFF" opacity="0.95" />
+  
+  <!-- Educational Foundation Green Base -->
+  <path d="M10 52 C22 50 42 50 54 52 C42 55 22 55 10 52 Z" fill="#1B7A4E" />
+</svg>
