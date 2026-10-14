@@ -23,6 +23,10 @@
       "dest": "frontend/static/$1"
     },
     {
+      "src": "/(favicon\\.svg|logo\\.png|robots\\.txt|manifest\\.json|asset-manifest\\.json)",
+      "dest": "frontend/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "frontend/index.html"
     }
