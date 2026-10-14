@@ -83,6 +83,9 @@ const updateUser = asyncHandler(async (req, res) => {
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
   const previousClassIds = [...(user.classes || [])];
+  const previousRole = user.role;
+  const previousSchool = user.school;
+  const previousName = user.name;
 
   const allowed = [
     'name',
@@ -142,6 +145,20 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 
   await user.save();
+
+  if (user.role === 'principal' && user.isActive) {
+    await School.findByIdAndUpdate(user.school, { principalName: user.name });
+  }
+  if (previousRole === 'principal' && (
+    user.role !== 'principal' ||
+    !user.isActive ||
+    previousSchool?.toString() !== user.school?.toString()
+  )) {
+    await School.updateOne(
+      { _id: previousSchool, principalName: previousName },
+      { $unset: { principalName: 1 } }
+    );
+  }
 
   if (user.role === 'teacher') {
     await syncTeacherClassAssignments({

@@ -198,6 +198,14 @@ const NAV = {
     { to: '/admin/rankings',  label: 'District Rankings',   icon: 'rankings' },
     { to: '/admin/resources', label: 'Content Approvals',   icon: 'resources' },
   ],
+  principal: [
+    { to: '/principal',              label: 'Dashboard',     icon: 'dashboard', exact: true },
+    { to: '/principal/classes',      label: 'Classes',       icon: 'classes' },
+    { to: '/principal/students',     label: 'Students',      icon: 'users' },
+    { to: '/principal/teachers',     label: 'Teachers',      icon: 'academic' },
+    { to: '/principal/interventions',label: 'Interventions', icon: 'bell' },
+    { to: '/principal/reports',      label: 'Reports',       icon: 'report' },
+  ],
   teacher: [
     { to: '/teacher',             label: 'Dashboard',        icon: 'dashboard', exact: true },
     { to: '/teacher/quizzes',     label: 'My Quizzes',       icon: 'quizzes' },
@@ -218,10 +226,11 @@ const NAV = {
   ],
 };
 
-const ROLE_LABELS = { admin: 'Administrator', teacher: 'Teacher', student: 'Student' };
-const ROLE_COLORS = { admin: 'hsl(24,93%,49%)', teacher: 'hsl(153,63%,29%)', student: 'hsl(217,89%,53%)' };
+const ROLE_LABELS = { admin: 'Administrator', principal: 'Principal', teacher: 'Teacher', student: 'Student' };
+const ROLE_COLORS = { admin: 'hsl(24,93%,49%)', principal: 'hsl(262,65%,53%)', teacher: 'hsl(153,63%,29%)', student: 'hsl(217,89%,53%)' };
 const ROLE_GRADIENTS = {
   admin:   'linear-gradient(135deg, hsl(24,93%,49%), hsl(24,91%,38%))',
+  principal: 'linear-gradient(135deg, hsl(262,65%,53%), hsl(262,65%,40%))',
   teacher: 'linear-gradient(135deg, hsl(153,63%,29%), hsl(153,65%,21%))',
   student: 'linear-gradient(135deg, hsl(217,89%,53%), hsl(217,89%,40%))',
 };

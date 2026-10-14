@@ -102,6 +102,7 @@ learningPathSchema.index({ student: 1, concept: 1 });
 doubtSchema.index({ class: 1, status: 1, createdAt: -1 });
 doubtSchema.index({ student: 1, createdAt: -1 });
 doubtSchema.index({ school: 1 });
+doubtSchema.index({ school: 1, status: 1, createdAt: -1 });
 
 contentResourceSchema.index({ concept: 1, isActive: 1, isApproved: 1 });
 contentResourceSchema.index({ school: 1, isActive: 1, isApproved: 1 });

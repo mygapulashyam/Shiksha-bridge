@@ -54,6 +54,6 @@ router.get('/improvement/:studentId', protect, authorize('teacher', 'admin'), ve
 router.get('/district-rankings', protect, authorize('admin'), getDistrictRankings);
 
 // Parent report for specific student (teacher/admin)
-router.get('/report/student/:studentId/pdf', protect, authorize('teacher', 'admin'), verifyStudentAccess, require('../controllers/studentController').downloadParentReport);
+router.get('/report/student/:studentId/pdf', protect, authorize('teacher', 'principal', 'admin'), verifyStudentAccess, require('../controllers/studentController').downloadParentReport);
 
 module.exports = router;

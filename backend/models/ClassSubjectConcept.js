@@ -23,6 +23,7 @@ const classSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+classSchema.index({ school: 1, isActive: 1, grade: 1, section: 1 });
 
 /* ─── Subject ────────────────────────────────── */
 const subjectSchema = new mongoose.Schema(

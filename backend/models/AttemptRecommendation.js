@@ -77,6 +77,7 @@ const attemptSchema = new mongoose.Schema(
 attemptSchema.index({ student: 1, quiz: 1, status: 1 });
 attemptSchema.index({ student: 1, status: 1, createdAt: -1 });
 attemptSchema.index({ school: 1, status: 1 });
+attemptSchema.index({ school: 1, status: 1, createdAt: -1 });
 // Partial unique index to prevent duplicate in-progress attempts from double-clicks
 attemptSchema.index(
   { student: 1, quiz: 1 },
@@ -143,6 +144,7 @@ const recommendationSchema = new mongoose.Schema(
 
 recommendationSchema.index({ student: 1, status: 1, priority: 1 });
 recommendationSchema.index({ student: 1, concept: 1 });
+recommendationSchema.index({ school: 1, student: 1, status: 1 });
 
 /* ─── ProgressReport ─────────────────────────── */
 const progressReportSchema = new mongoose.Schema(

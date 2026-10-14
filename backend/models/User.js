@@ -9,12 +9,12 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: [true, 'Email is required'], unique: true, lowercase: true, trim: true, match: [/^\S+@\S+\.\S+$/, 'Valid email required'] },
     password: { type: String, required: [true, 'Password is required'], minlength: [8, 'Password must be at least 8 characters'], select: false },
     passwordChangedAt: { type: Date },
-    role: { type: String, enum: ['admin', 'teacher', 'student'], required: true },
+    role: { type: String, enum: ['admin', 'principal', 'teacher', 'student'], required: true },
     school: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'School',
       required: [
-        function () { return this.role === 'teacher' || this.role === 'student'; },
+        function () { return this.role !== 'admin'; },
         'School is required for teachers and students',
       ],
     },
@@ -174,5 +174,9 @@ userSchema.methods.addXP = function (points) {
 
 userSchema.index({ school: 1, role: 1, isActive: 1 });
 userSchema.index({ class: 1, role: 1, isActive: 1 });
+userSchema.index(
+  { school: 1 },
+  { unique: true, partialFilterExpression: { role: 'principal', isActive: true } }
+);
 
 module.exports = mongoose.model('User', userSchema);

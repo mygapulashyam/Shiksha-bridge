@@ -30,6 +30,7 @@ const adminRoutes    = require('./routes/admin');
 const teacherRoutes  = require('./routes/teacher');
 const studentRoutes  = require('./routes/student');
 const featuresRoutes = require('./routes/features');
+const principalRoutes = require('./routes/principal');
 
 const app = express();
 
@@ -128,6 +129,7 @@ app.use('/api/admin',    adminRoutes);
 app.use('/api/teacher',  teacherRoutes);
 app.use('/api/student',  studentRoutes);
 app.use('/api/features', featuresRoutes);
+app.use('/api/principal', principalRoutes);
 
 app.use((req, res) => res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` }));
 app.use(errorHandler);
