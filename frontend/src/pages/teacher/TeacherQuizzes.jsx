@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import { Alert, Badge, EmptyState, Pagination, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const TYPE_COLORS = { diagnostic: 'badge-primary', practice: 'badge-success', remedial: 'badge-warning', assessment: 'badge-info' };
@@ -68,7 +69,7 @@ export default function TeacherQuizzes() {
         {loading ? (
           <div className="page-loader" style={{ minHeight: 200 }}><div className="spinner" /></div>
         ) : quizzes.length === 0 ? (
-          <EmptyState icon="📝" title="No quizzes yet" message="Create your first quiz to get started."
+          <EmptyState icon="quiz" title="No quizzes yet" message="Create your first quiz to get started."
             action={<Link to="/teacher/quizzes/new" className="btn btn-primary">+ Create Quiz</Link>} />
         ) : (
           <div className="table-wrapper">
@@ -91,7 +92,12 @@ export default function TeacherQuizzes() {
                   <tr key={q._id}>
                     <td style={{ fontWeight: 600 }}>{q.title}</td>
                     <td><span className={`badge ${TYPE_COLORS[q.type] || 'badge-gray'}`} style={{ textTransform: 'capitalize' }}>{q.type}</span></td>
-                    <td>{q.subject?.icon} {q.subject?.name}</td>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Icon name="book" size={14} color="var(--primary)" />
+                        <span>{q.subject?.name}</span>
+                      </span>
+                    </td>
                     <td>Class {q.grade}</td>
                     <td>{q.questions?.length || 0}</td>
                     <td>{q.attemptCount || 0}</td>
@@ -99,14 +105,20 @@ export default function TeacherQuizzes() {
                       {q.avgScore > 0 ? `${Math.round(q.avgScore)}%` : '—'}
                     </td>
                     <td>
-                      <span className={`badge ${q.isPublished ? 'badge-success' : 'badge-gray'}`}>
-                        {q.isPublished ? '🟢 Live' : '📋 Draft'}
+                      <span className={`badge ${q.isPublished ? 'badge-success' : 'badge-gray'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: q.isPublished ? '#16a34a' : '#9ca3af' }} />
+                        {q.isPublished ? 'Live' : 'Draft'}
                       </span>
                     </td>
                     <td>
                       <div className="flex gap-1">
-                        <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/teacher/quizzes/${q._id}/edit`)} style={{ fontSize: '0.75rem' }}>✏️ Edit</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => deleteQuiz(q._id)} style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>🗑️</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/teacher/quizzes/${q._id}/edit`)} style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <Icon name="edit" size={12} color="currentColor" />
+                          <span>Edit</span>
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => deleteQuiz(q._id)} style={{ fontSize: '0.75rem', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
+                          <Icon name="trash" size={13} color="var(--danger)" />
+                        </button>
                       </div>
                     </td>
                   </tr>

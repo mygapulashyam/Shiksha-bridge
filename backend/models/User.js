@@ -43,9 +43,11 @@ const userSchema = new mongoose.Schema(
     lockUntil: { type: Date, select: false },
 
     // Security – Password Reset
+    passwordResetOTP: { type: String, select: false },
+    passwordResetOTPExpires: { type: Date, select: false },
+    passwordResetOTPAttempts: { type: Number, default: 0, select: false },
     passwordResetToken: { type: String, select: false },
-    passwordResetExpires: { type: Date, select: false },
-    passwordResetAttempts: { type: Number, default: 0, select: false },
+    passwordResetTokenExpires: { type: Date, select: false },
 
     // Security – Refresh Tokens (Hashed & excluded from queries)
     refreshTokens: {
@@ -169,5 +171,8 @@ userSchema.methods.addXP = function (points) {
   this.totalPoints += points;
   this.level = Math.floor(this.xp / 500) + 1;
 };
+
+userSchema.index({ school: 1, role: 1, isActive: 1 });
+userSchema.index({ class: 1, role: 1, isActive: 1 });
 
 module.exports = mongoose.model('User', userSchema);

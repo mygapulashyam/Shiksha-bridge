@@ -110,6 +110,17 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 if (isDev) app.use(morgan('dev'));
 
+// Middleware to guarantee DB is connected before handling any API request (prevents Vercel cold-start errors)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection failed:', err);
+    res.status(503).json({ success: false, message: 'Database connection failed. Please try again in a few moments.' });
+  }
+});
+
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'ShikshaBridge API v1.1', timestamp: new Date().toISOString() }));
 
 app.use('/api/auth',     authRoutes);

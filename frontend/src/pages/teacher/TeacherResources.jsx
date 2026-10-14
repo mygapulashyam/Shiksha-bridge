@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Modal, Pagination, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
+import ResourceViewerModal from '../../components/features/ResourceViewerModal';
 import api from '../../api/axios';
 
 const TYPE_CONFIG = {
-  note:          { icon: '📄', color: '#2563EB', label: 'Note' },
-  video:         { icon: '🎬', color: '#7C3AED', label: 'Video' },
-  worksheet:     { icon: '📝', color: '#E8650A', label: 'Worksheet' },
-  example:       { icon: '💡', color: '#1B7A4E', label: 'Example' },
-  step_solution: { icon: '🔢', color: '#D63B3B', label: 'Step Solution' },
-  practice_set:  { icon: '🎯', color: '#F5B820', label: 'Practice Set' },
+  note:          { icon: 'file',     color: '#2563EB', label: 'Note' },
+  video:         { icon: 'clock',    color: '#7C3AED', label: 'Video' },
+  worksheet:     { icon: 'quiz',     color: '#E8650A', label: 'Worksheet' },
+  example:       { icon: 'bulb',     color: '#1B7A4E', label: 'Example' },
+  step_solution: { icon: 'chart',    color: '#D63B3B', label: 'Step Solution' },
+  practice_set:  { icon: 'target',   color: '#F5B820', label: 'Practice Set' },
 };
 
 const BLANK = { title: '', titleHindi: '', type: 'note', language: 'en', concept: '', subject: '', grade: 7, difficulty: 'basic', content: '', videoUrl: '', duration: 10 };
@@ -26,14 +28,21 @@ export default function TeacherResources() {
   const [filter, setFilter] = useState({ type: '', language: '' });
   const [page, setPage] = useState(1);
   const [msg, setMsg] = useState('');
-  const [error, setError] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [viewingResource, setViewingResource] = useState(null);
 
   useEffect(() => {
     api.get('/teacher/subjects').then(r => setSubjects(r.data.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (form.subject) api.get(`/teacher/concepts?subject=${form.subject}`).then(r => setConcepts(r.data.data)).catch(() => {});
+    if (form.subject) {
+      api.get(`/teacher/concepts?subject=${form.subject}`)
+        .then(r => setConcepts(r.data.data || []))
+        .catch(() => setConcepts([]));
+    } else {
+      setConcepts([]);
+    }
   }, [form.subject]);
 
   const fetchResources = async (pg = 1) => {
@@ -53,12 +62,25 @@ export default function TeacherResources() {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setModalError('');
     try {
-      await api.post('/features/resources', form);
-      setMsg('Resource created! Pending admin approval.'); setModal(false); setForm(BLANK);
+      const payload = { ...form };
+      if (!payload.concept) delete payload.concept;
+      if (!payload.subject) delete payload.subject;
+      if (payload.type === 'video' && payload.videoUrl) {
+        payload.videoUrl = payload.videoUrl.trim();
+      }
+      await api.post('/features/resources', payload);
+      setMsg('Resource created! Pending admin approval.');
+      setModal(false);
+      setForm(BLANK);
       fetchResources(1);
-    } catch (err) { setError(err.response?.data?.message || 'Save failed'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Save failed. Please check form inputs.';
+      setModalError(errMsg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const F = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -68,23 +90,26 @@ export default function TeacherResources() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="page-title">📖 Content Library</h1>
+            <h1 className="page-title flex items-center gap-2">
+              <Icon name="library" size={26} color="var(--primary)" />
+              <span>Content Library</span>
+            </h1>
             <p className="page-subtitle">Remedial notes, videos, worksheets, and practice sets for students</p>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => setModal(true)}>+ Add Resource</button>
         </div>
       </div>
 
-      {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
       {msg && <Alert type="success" onClose={() => setMsg('')}>{msg}</Alert>}
 
       {/* Filters */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        <button className={`btn btn-sm ${!filter.type ? 'btn-primary' : 'btn-ghost'}`} style={{ border: '1px solid var(--gray-200)' }} onClick={() => setFilter(p => ({ ...p, type: '' }))}>🗂 All</button>
+        <button className={`btn btn-sm ${!filter.type ? 'btn-primary' : 'btn-ghost'}`} style={{ border: '1px solid var(--gray-200)' }} onClick={() => setFilter(p => ({ ...p, type: '' }))}>All</button>
         {Object.entries(TYPE_CONFIG).map(([k, v]) => (
           <button key={k} className={`btn btn-sm ${filter.type === k ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ border: '1px solid var(--gray-200)' }} onClick={() => setFilter(p => ({ ...p, type: k }))}>
-            {v.icon} {v.label}
+            style={{ border: '1px solid var(--gray-200)', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => setFilter(p => ({ ...p, type: k }))}>
+            <Icon name={v.icon} size={14} color={filter.type === k ? 'white' : v.color} />
+            <span>{v.label}</span>
           </button>
         ))}
       </div>
@@ -92,7 +117,7 @@ export default function TeacherResources() {
       {loading ? (
         <div className="page-loader"><div className="spinner" /></div>
       ) : resources.length === 0 ? (
-        <EmptyState icon="📖" title="No resources yet" message="Add study notes, videos, or worksheets to help students."
+        <EmptyState icon="book" title="No resources yet" message="Add study notes, videos, or worksheets to help students."
           action={<button className="btn btn-primary" onClick={() => setModal(true)}>+ Add Resource</button>} />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
@@ -101,20 +126,71 @@ export default function TeacherResources() {
             return (
               <div key={r._id} style={{ background: 'var(--white)', borderRadius: 14, padding: 18, border: '2px solid var(--gray-200)', boxShadow: 'var(--shadow-sm)' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: cfg.color + '15', border: `1.5px solid ${cfg.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>{cfg.icon}</div>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: cfg.color + '15', border: `1.5px solid ${cfg.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={cfg.icon} size={18} color={cfg.color} />
+                  </div>
                   <div>
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: cfg.color, textTransform: 'uppercase' }}>{cfg.label}</span>
                     <div style={{ fontSize: '0.65rem', color: 'var(--gray-400)' }}>{r.difficulty} · {r.language?.toUpperCase()}</div>
                   </div>
                   {!r.isApproved && <span className="badge badge-warning" style={{ marginLeft: 'auto', fontSize: '0.65rem' }}>Pending</span>}
-                  {r.isApproved && <span className="badge badge-success" style={{ marginLeft: 'auto', fontSize: '0.65rem' }}>✅ Live</span>}
+                  {r.isApproved && <span className="badge badge-success" style={{ marginLeft: 'auto', fontSize: '0.65rem' }}>Live</span>}
                 </div>
                 <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>{r.title}</h4>
                 {r.titleHindi && <p style={{ fontSize: '0.78rem', color: 'var(--gray-600)', fontFamily: 'var(--font-devanagari)', marginBottom: 6 }}>{r.titleHindi}</p>}
-                {r.concept && <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)' }}>📚 {r.concept.name} · {r.concept.chapter}</div>}
-                {r.content && <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginTop: 8, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{r.content}</p>}
-                {r.videoUrl && <a href={r.videoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ marginTop: 10, fontSize: '0.75rem' }}>▶ Watch Video</a>}
-                {r.duration && <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', marginTop: 6 }}>⏱ {r.duration} min read/watch</div>}
+                {r.concept && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="book" size={12} color="var(--gray-400)" />
+                    <span>{r.concept.name} · {r.concept.chapter}</span>
+                  </div>
+                )}
+                {r.content && (
+                  <div style={{ marginTop: 8 }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                      {r.content}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setViewingResource(r)}
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '2px 0', marginTop: 2, color: 'var(--primary)', fontWeight: 600 }}
+                    >
+                      Read full note in-app →
+                    </button>
+                  </div>
+                )}
+                {r.videoUrl && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => setViewingResource(r)}
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <Icon name="video" size={13} color="white" />
+                      <span>Watch Video In-App</span>
+                    </button>
+                  </div>
+                )}
+                {r.fileUrl && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => setViewingResource(r)}
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <Icon name="file" size={13} color="white" />
+                      <span>View Document In-App</span>
+                    </button>
+                  </div>
+                )}
+                {r.duration && (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Icon name="clock" size={12} color="var(--gray-400)" />
+                    <span>{r.duration} min read/watch</span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -122,9 +198,16 @@ export default function TeacherResources() {
       )}
       <Pagination pagination={pagination} onPageChange={setPage} />
 
+      <ResourceViewerModal
+        open={!!viewingResource}
+        onClose={() => setViewingResource(null)}
+        resource={viewingResource}
+      />
+
       {/* Add Resource Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Add Content Resource" size="lg">
+      <Modal open={modal} onClose={() => { setModal(false); setModalError(''); }} title="Add Content Resource" size="lg">
         <form onSubmit={handleSave}>
+          {modalError && <Alert type="error" onClose={() => setModalError('')}>{modalError}</Alert>}
           <div className="grid-2 gap-3">
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label">Title (English) *</label>
@@ -137,7 +220,7 @@ export default function TeacherResources() {
             <div className="form-group">
               <label className="form-label">Resource Type *</label>
               <select className="form-input form-select" value={form.type} onChange={F('type')}>
-                {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+                {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -150,7 +233,7 @@ export default function TeacherResources() {
               <label className="form-label">Subject</label>
               <select className="form-input form-select" value={form.subject} onChange={F('subject')}>
                 <option value="">Select Subject</option>
-                {subjects.map(s => <option key={s._id} value={s._id}>{s.icon} {s.name}</option>)}
+                {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -193,7 +276,10 @@ export default function TeacherResources() {
           </div>
           <div className="flex gap-3" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
             <button type="button" className="btn btn-ghost" onClick={() => setModal(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : '✓ Save Resource'}</button>
+            <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="check" size={15} color="white" />
+              <span>{saving ? 'Saving…' : 'Save Resource'}</span>
+            </button>
           </div>
         </form>
       </Modal>

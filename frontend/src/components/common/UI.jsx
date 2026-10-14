@@ -4,6 +4,8 @@ import React from 'react';
    ShikshaBridge — Premium UI Components v2.0
    ══════════════════════════════════════════════════════════════ */
 
+import Icon, { getIconNameForEmoji } from './Icon';
+
 /* ── Spinner ── */
 export const Spinner = ({ size = 36, color }) => (
   <div style={{
@@ -25,39 +27,46 @@ export const PageLoader = ({ text }) => (
 );
 
 /* ── Alert ── */
-const ALERT_ICONS = {
-  success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️',
+const ALERT_ICON_CONFIG = {
+  success: { name: 'success', color: 'var(--success)' },
+  error:   { name: 'error',   color: 'var(--danger)' },
+  warning: { name: 'warning', color: '#D97706' },
+  info:    { name: 'info',    color: 'var(--primary)' },
 };
-export const Alert = ({ type = 'info', children, onClose }) => (
-  <div className={`alert alert-${type}`} role="alert">
-    <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '1.05rem' }}>
-      {ALERT_ICONS[type]}
-    </span>
-    <span style={{ flex: 1, lineHeight: 1.5 }}>{children}</span>
-    {onClose && (
-      <button
-        onClick={onClose}
-        aria-label="Dismiss"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          opacity: 0.6,
-          fontSize: '1rem',
-          lineHeight: 1,
-          padding: '2px',
-          borderRadius: '4px',
-          flexShrink: 0,
-          transition: 'opacity 150ms ease',
-        }}
-        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-        onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
-      >
-        ✕
-      </button>
-    )}
-  </div>
-);
+
+export const Alert = ({ type = 'info', children, onClose }) => {
+  const iconCfg = ALERT_ICON_CONFIG[type] || ALERT_ICON_CONFIG.info;
+  return (
+    <div className={`alert alert-${type}`} role="alert" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <span aria-hidden="true" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
+        <Icon name={iconCfg.name} size={18} color={iconCfg.color} />
+      </span>
+      <span style={{ flex: 1, lineHeight: 1.5 }}>{children}</span>
+      {onClose && (
+        <button
+          onClick={onClose}
+          aria-label="Dismiss"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            opacity: 0.6,
+            fontSize: '1rem',
+            lineHeight: 1,
+            padding: '2px',
+            borderRadius: '4px',
+            flexShrink: 0,
+            transition: 'opacity 150ms ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+};
 
 /* ── Badge ── */
 export const Badge = ({ type = 'gray', children }) => (
@@ -67,14 +76,19 @@ export const Badge = ({ type = 'gray', children }) => (
 /* ── Mastery Badge ── */
 export const MasteryBadge = ({ level }) => {
   const config = {
-    weak:        { label: 'Weak',        cls: 'mastery-weak',        icon: '⚠️' },
-    developing:  { label: 'Developing',  cls: 'mastery-developing',  icon: '📈' },
-    proficient:  { label: 'Proficient',  cls: 'mastery-proficient',  icon: '👍' },
-    mastered:    { label: 'Mastered',    cls: 'mastery-mastered',    icon: '⭐' },
-    not_started: { label: 'Not Started', cls: 'badge-gray',          icon: '○'  },
+    weak:        { label: 'Weak',        cls: 'mastery-weak',        icon: 'warning' },
+    developing:  { label: 'Developing',  cls: 'mastery-developing',  icon: 'trend-up' },
+    proficient:  { label: 'Proficient',  cls: 'mastery-proficient',  icon: 'success' },
+    mastered:    { label: 'Mastered',    cls: 'mastery-mastered',    icon: 'star' },
+    not_started: { label: 'Not Started', cls: 'badge-gray',          icon: 'clock' },
   };
   const c = config[level] || config.not_started;
-  return <span className={`badge ${c.cls}`}>{c.icon} {c.label}</span>;
+  return (
+    <span className={`badge ${c.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      <Icon name={c.icon} size={12} />
+      <span>{c.label}</span>
+    </span>
+  );
 };
 
 /* ── Progress Bar ── */
@@ -101,62 +115,76 @@ export const ProgressBar = ({ value, max = 100, color, animated = true }) => {
 };
 
 /* ── Stat Card ── */
-export const StatCard = ({ label, value, icon, color, sublabel, trend, onClick }) => (
-  <div
-    className={`stat-card ${onClick ? 'card-interactive' : ''}`}
-    onClick={onClick}
-    role={onClick ? 'button' : undefined}
-    tabIndex={onClick ? 0 : undefined}
-    onKeyDown={onClick ? e => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-  >
-    <div className="flex items-center justify-between mb-2">
-      <div className="stat-label">{label}</div>
-      {icon && (
-        <span style={{ fontSize: '1.6rem', lineHeight: 1 }} aria-hidden="true">
-          {icon}
-        </span>
-      )}
-    </div>
-    <div className="stat-value" style={{ color: color || 'var(--gray-900)' }}>
-      {value ?? '—'}
-    </div>
-    {(sublabel || trend) && (
-      <div
-        className="flex items-center gap-2 mt-2"
-        style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-400)' }}
-      >
-        {trend && (
-          <span style={{
-            color: trend > 0 ? 'var(--success)' : trend < 0 ? 'var(--danger)' : 'var(--gray-400)',
-            fontWeight: 700,
-          }}>
-            {trend > 0 ? '↑' : trend < 0 ? '↓' : '→'} {Math.abs(trend)}%
+export const StatCard = ({ label, value, icon, color, sublabel, trend, onClick }) => {
+  const mappedIconName = typeof icon === 'string' ? (getIconNameForEmoji(icon) || icon) : null;
+
+  return (
+    <div
+      className={`stat-card ${onClick ? 'card-interactive' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? e => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="stat-label">{label}</div>
+        {icon && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: color ? `${color}15` : 'var(--gray-100)', color: color || 'var(--gray-700)' }} aria-hidden="true">
+            {mappedIconName ? <Icon name={mappedIconName} size={20} color={color || 'currentColor'} /> : icon}
           </span>
         )}
-        {sublabel && <span>{sublabel}</span>}
       </div>
-    )}
-  </div>
-);
+      <div className="stat-value" style={{ color: color || 'var(--gray-900)' }}>
+        {value ?? '—'}
+      </div>
+      {(sublabel || trend) && (
+        <div
+          className="flex items-center gap-2 mt-2"
+          style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-400)' }}
+        >
+          {trend && (
+            <span style={{
+              color: trend > 0 ? 'var(--success)' : trend < 0 ? 'var(--danger)' : 'var(--gray-400)',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+            }}>
+              <Icon name={trend > 0 ? 'trend-up' : 'trend-down'} size={12} />
+              {Math.abs(trend)}%
+            </span>
+          )}
+          {sublabel && <span>{sublabel}</span>}
+        </div>
+      )}
+    </div>
+  );
+};
 
 /* ── Empty State ── */
-export const EmptyState = ({ icon = '📭', title, message, action }) => (
-  <div className="empty-state">
-    <span className="empty-state-icon" aria-hidden="true">{icon}</span>
-    <div className="empty-state-title">{title}</div>
-    {message && (
-      <p style={{
-        fontSize: 'var(--text-sm)',
-        maxWidth: 340,
-        margin: 'var(--space-2) auto 0',
-        lineHeight: 1.6,
-      }}>
-        {message}
-      </p>
-    )}
-    {action && <div style={{ marginTop: 'var(--space-5)' }}>{action}</div>}
-  </div>
-);
+export const EmptyState = ({ icon = 'empty', title, message, action }) => {
+  const mappedIconName = typeof icon === 'string' ? (getIconNameForEmoji(icon) || icon) : null;
+
+  return (
+    <div className="empty-state">
+      <span className="empty-state-icon" aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 24, background: 'var(--gray-100)', color: 'var(--gray-500)', margin: '0 auto 12px' }}>
+        {mappedIconName ? <Icon name={mappedIconName} size={24} color="var(--gray-500)" /> : icon}
+      </span>
+      <div className="empty-state-title">{title}</div>
+      {message && (
+        <p style={{
+          fontSize: 'var(--text-sm)',
+          maxWidth: 340,
+          margin: 'var(--space-2) auto 0',
+          lineHeight: 1.6,
+        }}>
+          {message}
+        </p>
+      )}
+      {action && <div style={{ marginTop: 'var(--space-5)' }}>{action}</div>}
+    </div>
+  );
+};
 
 /* ── Modal ── */
 export const Modal = ({ open, onClose, title, children, size = '' }) => {

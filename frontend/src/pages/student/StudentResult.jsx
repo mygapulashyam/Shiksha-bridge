@@ -5,10 +5,12 @@ import Layout from '../../components/common/Layout';
 import { PageLoader, Alert, MasteryBadge, ProgressBar, ScoreCircle } from '../../components/common/UI';
 import api from '../../api/axios';
 
+import Icon from '../../components/common/Icon';
+
 const RULE_MESSAGES = {
-  score_below_40: { label: 'Needs Practice', color: 'var(--danger)', bg: '#FFEBEB', icon: '🔧', advice: 'Don\'t worry! Everyone has areas to improve. Your teacher has assigned remedial drills to help you master the basics.' },
-  score_40_to_70:  { label: 'Keep Going!',   color: 'var(--accent-dark)', bg: '#FFF8E1', icon: '📖', advice: 'You\'re making good progress! Keep practising the concepts and you\'ll reach mastery.' },
-  score_above_70:  { label: 'Excellent!',    color: 'var(--secondary)', bg: 'var(--secondary-light)', icon: '🚀', advice: 'Outstanding work! You have a strong grasp of these concepts. Ready for the next challenge!' },
+  score_below_40: { label: 'Needs Practice', color: 'var(--danger)', bg: '#FFEBEB', icon: 'wrench', advice: 'Don\'t worry! Everyone has areas to improve. Your teacher has assigned remedial drills to help you master the basics.' },
+  score_40_to_70:  { label: 'Keep Going!',   color: 'var(--accent-dark)', bg: '#FFF8E1', icon: 'book', advice: 'You\'re making good progress! Keep practising the concepts and you\'ll reach mastery.' },
+  score_above_70:  { label: 'Excellent!',    color: 'var(--secondary)', bg: 'var(--secondary-light)', icon: 'star', advice: 'Outstanding work! You have a strong grasp of these concepts. Ready for the next challenge!' },
 };
 
 export default function StudentResult() {
@@ -54,7 +56,9 @@ export default function StudentResult() {
     <Layout>
       {/* Result Hero */}
       <div style={{ background: rule.bg, border: `2px solid ${rule.color}30`, borderRadius: 20, padding: '32px', marginBottom: 24, textAlign: 'center' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>{rule.icon}</div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', background: 'white', color: rule.color, marginBottom: 12, boxShadow: 'var(--shadow-sm)' }}>
+          <Icon name={rule.icon} size={28} color={rule.color} />
+        </div>
         <ScoreCircle percentage={pct} />
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, color: rule.color, marginTop: 16 }}>
           {rule.label}
@@ -73,7 +77,9 @@ export default function StudentResult() {
       {aiAnalysis && (
         <div className="card mb-6" style={{ background: 'linear-gradient(135deg, #F0FDF4, #ECFDF5)', border: '1.5px solid var(--secondary-light)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: '1.25rem' }}>🤖</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--secondary)' }}>
+              <Icon name="ai" size={20} color="var(--secondary)" />
+            </span>
             <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--secondary-dark)' }}>AI Learning Assessment</h3>
           </div>
           <p style={{ fontSize: '0.9rem', color: 'var(--gray-800)', lineHeight: 1.6 }}>
@@ -85,11 +91,16 @@ export default function StudentResult() {
       {/* New Badges */}
       {newBadges?.length > 0 && (
         <div style={{ background: 'linear-gradient(135deg, #FFF8E1, #FFFDE7)', border: '2px solid var(--accent)', borderRadius: 16, padding: 20, marginBottom: 24, textAlign: 'center' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-dark)', marginBottom: 12 }}>🎉 You Earned New Badges!</div>
+          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-dark)', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <Icon name="sparkles" size={18} color="var(--accent-dark)" />
+            <span>You Earned New Badges!</span>
+          </div>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
             {newBadges.map((b, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '12px 20px', background: 'white', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
-                <div style={{ fontSize: '2rem' }}>{b.icon || '🏅'}</div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', margin: '0 auto 6px' }}>
+                  <Icon name="badge" size={24} color="var(--primary)" />
+                </div>
                 <div style={{ fontWeight: 700, fontSize: '0.85rem', marginTop: 4 }}>{b.name}</div>
               </div>
             ))}
@@ -102,7 +113,10 @@ export default function StudentResult() {
       <div className="grid-2 gap-4 mb-6">
         {/* Concept Scores */}
         <div className="card">
-          <h3 style={{ fontWeight: 700, marginBottom: 16, fontSize: '1rem' }}>📊 Concept-wise Performance</h3>
+          <h3 style={{ fontWeight: 700, marginBottom: 16, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icon name="chart" size={18} color="var(--primary)" />
+            <span>Concept-wise Performance</span>
+          </h3>
           {conceptScores.length === 0 ? (
             <p className="text-muted text-sm">No concept-level data available.</p>
           ) : (
@@ -164,8 +178,13 @@ export default function StudentResult() {
           <h3 style={{ fontWeight: 700, marginBottom: 16, fontSize: '1rem' }}>📋 Answer Review</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {attempt.answers.map((ans, i) => {
-              const q = ans.question;
-              if (!q) return null;
+              const q = ans.question || {};
+              const qText = q.text || ans.questionText;
+              const qType = q.type || ans.questionType || 'mcq';
+              const qOptions = (q.options && q.options.length > 0) ? q.options : (ans.options || []);
+              const qExplanation = q.explanation || ans.explanation;
+              if (!qText) return null;
+
               return (
                 <div key={i} style={{
                   padding: '16px',
@@ -178,12 +197,12 @@ export default function StudentResult() {
                       {ans.isCorrect ? '✓' : '✗'}
                     </span>
                     <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--gray-900)' }}>
-                      Q{i + 1}. {q.text}
+                      Q{i + 1}. {qText}
                     </p>
                   </div>
 
                   <div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {q.options?.map(opt => {
+                    {qOptions?.map(opt => {
                       const isSelected = ans.selectedOption?.trim().toUpperCase() === opt.label?.trim().toUpperCase();
                       const isCorrectOpt = opt.isCorrect || (isSelected && ans.isCorrect);
                       let bg = 'transparent', color = 'var(--gray-600)', border = 'transparent';
@@ -200,19 +219,19 @@ export default function StudentResult() {
                     })}
 
                     {/* Fill blank */}
-                    {q.type === 'fillblank' && (
+                    {qType === 'fillblank' && (
                       <div style={{ fontSize: '0.85rem' }}>
                         <span style={{ color: ans.isCorrect ? 'var(--secondary)' : 'var(--danger)', fontWeight: 700 }}>
                           Your answer: "{ans.enteredAnswer || '—'}"
                         </span>
-                        {!ans.isCorrect && <span style={{ color: 'var(--secondary)', fontWeight: 700, marginLeft: 12 }}>Correct: "{q.correctAnswer}"</span>}
+                        {!ans.isCorrect && q.correctAnswer && <span style={{ color: 'var(--secondary)', fontWeight: 700, marginLeft: 12 }}>Correct: "{q.correctAnswer}"</span>}
                       </div>
                     )}
 
                     {/* Explanation */}
-                    {q.explanation && (
+                    {qExplanation && (
                       <div style={{ marginTop: 6, padding: '8px 12px', background: 'rgba(27,122,78,0.08)', borderRadius: 6, fontSize: '0.82rem', color: 'var(--secondary-dark)', borderLeft: '3px solid var(--secondary)' }}>
-                        💡 {q.explanation}
+                        💡 {qExplanation}
                       </div>
                     )}
                   </div>

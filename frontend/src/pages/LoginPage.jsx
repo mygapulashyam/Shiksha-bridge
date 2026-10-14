@@ -142,8 +142,8 @@ export default function LoginPage() {
       setError('Please fill in all fields.');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -154,6 +154,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/reset-password', {
+        email: forgotEmail,
         token: resetToken,
         newPassword
       });

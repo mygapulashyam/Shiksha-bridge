@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Modal } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const GRADES = [6, 7, 8, 9, 10];
@@ -270,10 +271,13 @@ export default function AdminClasses() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-            <button className="btn btn-ghost btn-sm" onClick={fetchClasses}>🔄 Refresh</button>
+            <button className="btn btn-ghost btn-sm" onClick={fetchClasses} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="refresh" size={13} color="currentColor" />
+              <span>Refresh</span>
+            </button>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-outline btn-sm" onClick={() => setBulkModal(true)}>⚡ Bulk Create</button>
+            <button className="btn btn-outline btn-sm" onClick={() => setBulkModal(true)}>Bulk Create</button>
             <button className="btn btn-primary btn-sm" onClick={() => setCreateModal(true)}>+ Add Class</button>
           </div>
         </div>
@@ -283,7 +287,7 @@ export default function AdminClasses() {
       {loading ? (
         <div className="page-loader" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : classes.length === 0 ? (
-        <EmptyState icon="🏫" title="No classes found"
+        <EmptyState icon="class" title="No classes found"
           message={filterSchool || filterGrade ? 'Try adjusting filters or create a new class.' : 'Start by creating classes for your schools.'} />
       ) : (
         Object.keys(classesGrouped).map(grade => {
@@ -383,10 +387,15 @@ export default function AdminClasses() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-outline btn-sm" style={{ fontSize: '0.72rem' }}
-                              onClick={() => openEdit(cls)}>✏️ Edit</button>
-                            <button className="btn btn-sm" style={{ fontSize: '0.72rem', background: 'var(--danger)', color: 'white', border: 'none' }}
-                              onClick={() => openDelete(cls)}>🗑️</button>
+                            <button className="btn btn-outline btn-sm" style={{ fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              onClick={() => openEdit(cls)}>
+                              <Icon name="edit" size={12} color="currentColor" />
+                              <span>Edit</span>
+                            </button>
+                            <button className="btn btn-sm" style={{ fontSize: '0.72rem', background: 'var(--danger)', color: 'white', border: 'none', display: 'inline-flex', alignItems: 'center' }}
+                              onClick={() => openDelete(cls)}>
+                              <Icon name="trash" size={12} color="white" />
+                            </button>
                           </div>
                         </td>
                       </tr>

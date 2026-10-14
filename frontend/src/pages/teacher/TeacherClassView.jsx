@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Layout from '../../components/common/Layout';
-import { PageLoader, Alert, SectionHeader, MasteryBadge, ProgressBar } from '../../components/common/UI';
+import { PageLoader, Alert, SectionHeader, MasteryBadge, ProgressBar, EmptyState } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 export default function TeacherClassView() {
@@ -85,8 +86,8 @@ export default function TeacherClassView() {
         <div className="card">
           <SectionHeader title="Student Scores" subtitle="Average score per student (top 15)" />
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-100)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
@@ -96,10 +97,7 @@ export default function TeacherClassView() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">📊</div>
-              <p>No quiz attempts yet in this class</p>
-            </div>
+            <EmptyState icon="chart" title="No attempts yet" message="No quiz attempts yet in this class" />
           )}
         </div>
 
@@ -107,10 +105,7 @@ export default function TeacherClassView() {
         <div className="card">
           <SectionHeader title="Class-Wide Weak Concepts" subtitle="Needs teacher intervention" />
           {weakConcepts.length === 0 ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">🎉</div>
-              <p>No weak concepts detected yet</p>
-            </div>
+            <EmptyState icon="sparkles" title="No weak concepts" message="No weak concepts detected yet" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 260, overflowY: 'auto' }}>
               {weakConcepts.map((c, i) => (
@@ -121,7 +116,10 @@ export default function TeacherClassView() {
                       {c.chapter && <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginLeft: 6 }}>{c.chapter}</span>}
                     </div>
                     <div className="flex gap-2 items-center">
-                      <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 700 }}>⚠️ {c.weakStudents} weak</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Icon name="warning" size={12} color="var(--danger)" />
+                        {c.weakStudents} weak
+                      </span>
                       <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--danger)' }}>{c.avgScore}%</span>
                     </div>
                   </div>
@@ -174,10 +172,20 @@ export default function TeacherClassView() {
                   </td>
                   <td>{s.lastScore !== null ? `${s.lastScore}%` : '—'}</td>
                   <td>{s.totalAttempts}</td>
-                  <td>{s.streak > 0 ? `🔥 ${s.streak}` : '—'}</td>
+                  <td>
+                    {s.streak > 0 ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Icon name="flame" size={13} color="#FF6B35" />
+                        {s.streak}
+                      </span>
+                    ) : '—'}
+                  </td>
                   <td><MasteryBadge level={s.status === 'not_started' ? 'not_started' : s.status} /></td>
                   <td>
-                    <Link to={`/teacher/students/${s._id}`} className="btn btn-ghost btn-sm" style={{ fontSize: '0.75rem' }}>📋 Detail</Link>
+                    <Link to={`/teacher/students/${s._id}`} className="btn btn-ghost btn-sm" style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Icon name="clipboard" size={13} color="currentColor" />
+                      Detail
+                    </Link>
                   </td>
                 </tr>
               ))}

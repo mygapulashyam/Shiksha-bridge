@@ -2,17 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import Layout from '../../components/common/Layout';
-import { StatCard, PageLoader, SectionHeader, Alert } from '../../components/common/UI';
+import { StatCard, PageLoader, SectionHeader, Alert, EmptyState } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingResourcesCount, setPendingResourcesCount] = useState(0);
 
   useEffect(() => {
-    api.get('/admin/analytics')
-      .then(r => setData(r.data.data))
+    Promise.all([
+      api.get('/admin/analytics'),
+      api.get('/features/resources?isApproved=false&limit=1').catch(() => ({ data: { pagination: { total: 0 } } })),
+    ])
+      .then(([analyticsRes, resourcesRes]) => {
+        setData(analyticsRes.data.data);
+        setPendingResourcesCount(resourcesRes.data?.pagination?.total || 0);
+      })
       .catch(() => setError('Failed to load analytics'))
       .finally(() => setLoading(false));
   }, []);
@@ -28,14 +36,47 @@ export default function AdminDashboard() {
 
       {error && <Alert type="error">{error}</Alert>}
 
+      {pendingResourcesCount > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(232, 101, 10, 0.08), rgba(245, 184, 32, 0.12))',
+          border: '1.5px solid rgba(232, 101, 10, 0.3)',
+          borderRadius: 12,
+          padding: '14px 18px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(232, 101, 10, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="library" size={18} color="var(--primary)" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>
+                {pendingResourcesCount} Teacher Resource{pendingResourcesCount > 1 ? 's' : ''} Awaiting Approval
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
+                Review teacher-submitted videos, notes, or worksheets to publish them for students.
+              </div>
+            </div>
+          </div>
+          <Link to="/admin/resources" className="btn btn-primary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span>Review Approvals</span>
+            <Icon name="arrow-right" size={14} color="white" />
+          </Link>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="stats-grid mb-6">
-        <StatCard label="Total Schools" value={data?.summary?.totalSchools} icon="🏫" color="var(--primary)" />
-        <StatCard label="Teachers" value={data?.summary?.totalTeachers} icon="👩‍🏫" color="var(--secondary)" />
-        <StatCard label="Students" value={data?.summary?.totalStudents} icon="🎒" color="#2563EB" />
-        <StatCard label="Total Quizzes" value={data?.summary?.totalQuizzes} icon="📝" color="var(--accent-dark)" />
-        <StatCard label="Quiz Attempts" value={data?.summary?.totalAttempts} icon="✅" color="var(--primary)" />
-        <StatCard label="Platform Avg Score" value={`${data?.summary?.avgScore ?? 0}%`} icon="🎯"
+        <StatCard label="Total Schools" value={data?.summary?.totalSchools} icon="school" color="var(--primary)" />
+        <StatCard label="Teachers" value={data?.summary?.totalTeachers} icon="academic" color="var(--secondary)" />
+        <StatCard label="Students" value={data?.summary?.totalStudents} icon="users" color="#2563EB" />
+        <StatCard label="Total Quizzes" value={data?.summary?.totalQuizzes} icon="quiz" color="var(--accent-dark)" />
+        <StatCard label="Quiz Attempts" value={data?.summary?.totalAttempts} icon="success" color="var(--primary)" />
+        <StatCard label="Platform Avg Score" value={`${data?.summary?.avgScore ?? 0}%`} icon="target"
           color={data?.summary?.avgScore >= 70 ? 'var(--secondary)' : data?.summary?.avgScore >= 40 ? 'var(--accent-dark)' : 'var(--danger)'} />
       </div>
 
@@ -54,10 +95,7 @@ export default function AdminDashboard() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">📊</div>
-              <p>No school data yet</p>
-            </div>
+            <EmptyState icon="chart" title="No school data" message="No school data recorded yet" />
           )}
         </div>
 
@@ -80,10 +118,7 @@ export default function AdminDashboard() {
               ))}
             </div>
           ) : (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">🕐</div>
-              <p>No quiz attempts yet</p>
-            </div>
+            <EmptyState icon="clock" title="No quiz attempts" message="No quiz attempts recorded yet" />
           )}
         </div>
       </div>

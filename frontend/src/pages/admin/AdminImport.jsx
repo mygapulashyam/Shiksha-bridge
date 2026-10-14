@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const IMPORT_TYPES = [
-  { key: 'schools',  label: 'Schools',  icon: '🏫', desc: 'name, udiseCode, district, state, type…' },
-  { key: 'classes',  label: 'Classes',  icon: '🏛️', desc: 'name, grade, section, schoolName…' },
-  { key: 'subjects', label: 'Subjects', icon: '📚', desc: 'name, code, grade, icon, color…' },
-  { key: 'concepts', label: 'Concepts', icon: '🧩', desc: 'name, nameHindi, subjectName, grade, chapter…' },
-  { key: 'teachers', label: 'Teachers', icon: '👩‍🏫', desc: 'name, email, password, schoolName…' },
-  { key: 'students', label: 'Students', icon: '🎒', desc: 'name, email, password, className, rollNumber…' },
+  { key: 'schools',  label: 'Schools',  icon: 'school', desc: 'name, udiseCode, district, state, type…' },
+  { key: 'classes',  label: 'Classes',  icon: 'class', desc: 'name, grade, section, schoolName…' },
+  { key: 'subjects', label: 'Subjects', icon: 'book', desc: 'name, code, grade, icon, color…' },
+  { key: 'concepts', label: 'Concepts', icon: 'bulb', desc: 'name, nameHindi, subjectName, grade, chapter…' },
+  { key: 'teachers', label: 'Teachers', icon: 'academic', desc: 'name, email, password, schoolName…' },
+  { key: 'students', label: 'Students', icon: 'users', desc: 'name, email, password, className, rollNumber…' },
 ];
 
 export default function AdminImport() {
@@ -51,7 +52,10 @@ export default function AdminImport() {
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">📥 CSV Bulk Import</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="import" size={26} color="var(--primary)" />
+          <span>CSV Bulk Import</span>
+        </h1>
         <p className="page-subtitle">Import schools, teachers, students, classes, subjects, and concepts in bulk</p>
       </div>
 
@@ -71,7 +75,9 @@ export default function AdminImport() {
                   background: activeType === t.key ? 'var(--primary-light)' : 'var(--gray-50)',
                   display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.15s',
                 }}>
-                <span style={{ fontSize: '1.4rem' }}>{t.icon}</span>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: activeType === t.key ? 'var(--white)' : 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name={t.icon} size={18} color="var(--primary)" />
+                </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: activeType === t.key ? 'var(--primary-dark)' : 'var(--gray-900)' }}>{t.label}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{t.desc}</div>
@@ -93,8 +99,9 @@ export default function AdminImport() {
             <p style={{ fontSize: '0.8rem', color: 'var(--secondary-dark)', marginBottom: 10 }}>
               Download the CSV template, fill in your data, and upload below.
             </p>
-            <button className="btn btn-secondary btn-sm" onClick={() => downloadTemplate(activeType)}>
-              ⬇️ Download {active?.label} Template
+            <button className="btn btn-secondary btn-sm" onClick={() => downloadTemplate(activeType)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="download" size={14} color="white" />
+              <span>Download {active?.label} Template</span>
             </button>
           </div>
 
@@ -111,7 +118,9 @@ export default function AdminImport() {
             }}
               onDragOver={e => e.preventDefault()}
               onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setFile(f); }}>
-              <span style={{ fontSize: '2rem' }}>{file ? '✅' : '📎'}</span>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--white)', border: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={file ? 'check' : 'import'} size={22} color={file ? 'var(--secondary)' : 'var(--primary)'} />
+              </div>
               <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--gray-700)' }}>
                 {file ? file.name : 'Click or drag & drop CSV file'}
               </span>
@@ -123,7 +132,7 @@ export default function AdminImport() {
           <button className="btn btn-primary btn-full" onClick={handleUpload} disabled={uploading || !file}>
             {uploading
               ? <span className="flex items-center gap-2"><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Importing…</span>
-              : `📤 Import ${active?.label}`}
+              : `Import ${active?.label}`}
           </button>
 
           {/* Results */}
@@ -132,16 +141,16 @@ export default function AdminImport() {
               <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
                 <div style={{ flex: 1, padding: '10px 14px', background: 'var(--secondary-light)', borderRadius: 8, textAlign: 'center' }}>
                   <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--secondary)' }}>{result.created}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--secondary-dark)' }}>✅ Created</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--secondary-dark)' }}>Created</div>
                 </div>
                 <div style={{ flex: 1, padding: '10px 14px', background: 'var(--gray-100)', borderRadius: 8, textAlign: 'center' }}>
                   <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--gray-600)' }}>{result.skipped}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)' }}>⏭ Skipped</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)' }}>Skipped</div>
                 </div>
                 {result.errors?.length > 0 && (
                   <div style={{ flex: 1, padding: '10px 14px', background: '#FFEBEB', borderRadius: 8, textAlign: 'center' }}>
                     <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--danger)' }}>{result.errors.length}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>❌ Errors</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Errors</div>
                   </div>
                 )}
               </div>
@@ -159,18 +168,21 @@ export default function AdminImport() {
 
       {/* CSV format guide */}
       <div className="card" style={{ marginTop: 24 }}>
-        <SectionHeader title="📋 CSV Format Guide" subtitle="Column requirements for each import type" />
+        <SectionHeader title="CSV Format Guide" subtitle="Column requirements for each import type" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
           {IMPORT_TYPES.map(t => (
             <div key={t.key} style={{ padding: '12px 14px', background: 'var(--gray-50)', borderRadius: 8, border: '1px solid var(--gray-200)' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>{t.icon} {t.label}</div>
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name={t.icon} size={14} color="var(--primary)" />
+                <span>{t.label}</span>
+              </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', fontFamily: 'monospace' }}>{t.desc}</div>
             </div>
           ))}
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: 12 }}>
-          💡 Download the template for each type to see the exact column names and example data.
-          Duplicate rows (same name + key field) are automatically skipped.
+        <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="bulb" size={14} color="var(--accent-dark)" />
+          <span>Download the template for each type to see the exact column names and example data. Duplicate rows (same name + key field) are automatically skipped.</span>
         </p>
       </div>
     </Layout>

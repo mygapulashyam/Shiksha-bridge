@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import Layout from '../../components/common/Layout';
-import { PageLoader, Alert, MasteryBadge, ProgressBar, SectionHeader } from '../../components/common/UI';
+import { PageLoader, Alert, MasteryBadge, ProgressBar, SectionHeader, EmptyState } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
-const BADGE_ICONS = { 'First Steps': '🎯', 'Perfect Score': '⭐', 'Week Warrior': '🔥', 'Month Master': '🏆' };
 const MASTERY_ORDER = { mastered: 4, proficient: 3, developing: 2, weak: 1, not_started: 0 };
 
 export default function StudentProgress() {
@@ -66,7 +66,10 @@ export default function StudentProgress() {
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">My Progress</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="progress" size={26} color="var(--primary)" />
+          <span>My Progress</span>
+        </h1>
         <p className="page-subtitle">Track your learning journey, concept mastery, and achievements</p>
       </div>
 
@@ -76,26 +79,38 @@ export default function StudentProgress() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
         <div style={{ background: 'linear-gradient(135deg, #FF6B35, #FF4500)', borderRadius: 14, padding: '20px', color: 'white', textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>{user?.streak || 0}</div>
-          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4 }}>🔥 Day Streak</div>
+          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="flame" size={16} color="white" />
+            <span>Day Streak</span>
+          </div>
         </div>
         <div style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))', borderRadius: 14, padding: '20px', color: 'white', textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>{user?.totalPoints || 0}</div>
-          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4 }}>⭐ Total Points</div>
+          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="star" size={16} color="white" />
+            <span>Total Points</span>
+          </div>
         </div>
         <div style={{ background: 'linear-gradient(135deg, var(--secondary), var(--secondary-dark))', borderRadius: 14, padding: '20px', color: 'white', textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>{attempts.length}</div>
-          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4 }}>📝 Quizzes Done</div>
+          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="quiz" size={16} color="white" />
+            <span>Quizzes Done</span>
+          </div>
         </div>
         <div style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', borderRadius: 14, padding: '20px', color: 'white', textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>{user?.badges?.length || 0}</div>
-          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4 }}>🏅 Badges Earned</div>
+          <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="badge" size={16} color="white" />
+            <span>Badges Earned</span>
+          </div>
         </div>
       </div>
 
       {/* Score Trend */}
       {trendData.length > 1 && (
         <div className="card mb-6">
-          <SectionHeader title="📈 Score Trend" subtitle={`Last ${trendData.length} quiz attempts`} />
+          <SectionHeader title="Score Trend" subtitle={`Last ${trendData.length} quiz attempts`} />
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-100)" />
@@ -112,13 +127,10 @@ export default function StudentProgress() {
       <div className="grid-2 gap-4 mb-6">
         {/* Subject Progress */}
         <div className="card">
-          <SectionHeader title="📚 Subject Overview" subtitle={`${reports.length} subjects tracked`} />
+          <SectionHeader title="Subject Overview" subtitle={`${reports.length} subjects tracked`} />
           {reports.length === 0 ? (
-            <div className="empty-state" style={{ padding: 32 }}>
-              <div className="empty-state-icon">📚</div>
-              <p className="text-muted">No subject progress yet. Attempt a quiz to start tracking!</p>
-              <Link to="/student/quizzes" className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>Browse Quizzes</Link>
-            </div>
+            <EmptyState icon="book" title="No subject progress yet" message="Attempt a quiz to start tracking!"
+              action={<Link to="/student/quizzes" className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>Browse Quizzes</Link>} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {reports.map(r => (
@@ -130,7 +142,10 @@ export default function StudentProgress() {
                     background: activeReport?._id === r._id ? 'var(--primary-light)' : 'var(--gray-50)',
                   }}>
                   <div className="flex items-center justify-between mb-2">
-                    <span style={{ fontWeight: 700 }}>{r.subject?.icon} {r.subject?.name}</span>
+                    <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="book" size={16} color="var(--primary)" />
+                      {r.subject?.name}
+                    </span>
                     <span style={{ fontWeight: 800, color: r.avgScore >= 70 ? 'var(--secondary)' : r.avgScore >= 40 ? 'var(--accent-dark)' : 'var(--danger)' }}>{r.avgScore}%</span>
                   </div>
                   <ProgressBar value={r.avgScore} />
@@ -150,7 +165,7 @@ export default function StudentProgress() {
 
         {/* Concept Mastery for active subject */}
         <div className="card">
-          <SectionHeader title={`🧩 Concept Mastery${activeReport?.subject ? ` — ${activeReport.subject.name}` : ''}`}
+          <SectionHeader title={`Concept Mastery${activeReport?.subject ? ` — ${activeReport.subject.name}` : ''}`}
             subtitle="Click a subject to see its concepts" />
           {!activeReport ? (
             <div className="empty-state" style={{ padding: 32 }}>
@@ -160,9 +175,16 @@ export default function StudentProgress() {
             <>
               {/* Mastery Summary */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-                {[['mastered', '⭐', 'var(--secondary)'], ['proficient', '👍', 'var(--info)'], ['developing', '📈', 'var(--accent-dark)'], ['weak', '⚠️', 'var(--danger)']].map(([level, icon, color]) => (
+                {[
+                  ['mastered', 'star', 'var(--secondary)'],
+                  ['proficient', 'success', 'var(--info)'],
+                  ['developing', 'trend-up', 'var(--accent-dark)'],
+                  ['weak', 'warning', 'var(--danger)']
+                ].map(([level, iconName, color]) => (
                   <div key={level} style={{ flex: 1, minWidth: 70, textAlign: 'center', padding: '8px', background: `${color}12`, borderRadius: 8 }}>
-                    <div style={{ fontSize: '1.2rem' }}>{icon}</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}>
+                      <Icon name={iconName} size={18} color={color} />
+                    </div>
                     <div style={{ fontWeight: 800, color, fontSize: '1rem' }}>{masteryCount(level)}</div>
                     <div style={{ fontSize: '0.68rem', color: 'var(--gray-500)', textTransform: 'capitalize' }}>{level}</div>
                   </div>
@@ -195,7 +217,7 @@ export default function StudentProgress() {
       {/* Concept Bar Chart */}
       {conceptBarData.length > 0 && (
         <div className="card mb-6">
-          <SectionHeader title={`📊 Concept Scores${activeReport?.subject ? ` — ${activeReport.subject.name}` : ''}`} subtitle="Last score vs best score per concept" />
+          <SectionHeader title={`Concept Scores${activeReport?.subject ? ` — ${activeReport.subject.name}` : ''}`} subtitle="Last score vs best score per concept" />
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={conceptBarData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-100)" />
@@ -211,14 +233,10 @@ export default function StudentProgress() {
 
       {/* My Tasks (Recommendations) */}
       <div className="card mb-6">
-        <SectionHeader title="📋 Pending Tasks" subtitle="Complete these to improve your weak areas"
+        <SectionHeader title="Pending Tasks" subtitle="Complete these to improve your weak areas"
           action={<Link to="/student/quizzes" className="btn btn-primary btn-sm">Find Quizzes →</Link>} />
         {recommendations.length === 0 ? (
-          <div className="empty-state" style={{ padding: 28 }}>
-            <div className="empty-state-icon">🎉</div>
-            <p style={{ fontWeight: 700 }}>All caught up!</p>
-            <p className="text-sm text-muted">Attempt more quizzes to get personalised tasks.</p>
-          </div>
+          <EmptyState icon="sparkles" title="All caught up!" message="Attempt more quizzes to get personalised tasks." />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {recommendations.map(r => (
@@ -226,13 +244,18 @@ export default function StudentProgress() {
                 display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px',
                 borderRadius: 10, background: 'var(--gray-50)', border: '1px solid var(--gray-200)'
               }}>
-                <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>
-                  {r.type === 'remedial_drill' ? '🔧' : r.type === 'next_concept' ? '🚀' : '📖'}
-                </span>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--white)', border: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name={r.type === 'remedial_drill' ? 'wrench' : r.type === 'next_concept' ? 'rocket' : 'book'} size={18} color="var(--primary)" />
+                </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>{r.task?.title}</div>
                   <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginTop: 2 }}>{r.message}</p>
-                  {r.concept && <div style={{ fontSize: '0.72rem', color: 'var(--gray-400)', marginTop: 2 }}>📚 {r.concept.name}</div>}
+                  {r.concept && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Icon name="book" size={11} color="var(--gray-400)" />
+                      {r.concept.name}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => markComplete(r._id)} className="btn btn-success btn-sm"
                   style={{ flexShrink: 0, background: 'var(--secondary)', color: 'white', fontSize: '0.75rem' }}>
@@ -246,17 +269,16 @@ export default function StudentProgress() {
 
       {/* Badges */}
       <div className="card">
-        <SectionHeader title="🏅 Achievements" subtitle="Badges earned through your hard work" />
+        <SectionHeader title="Achievements" subtitle="Badges earned through your hard work" />
         {!user?.badges?.length ? (
-          <div className="empty-state" style={{ padding: 28 }}>
-            <div className="empty-state-icon">🏅</div>
-            <p className="text-muted text-sm">Start taking quizzes to earn your first badge!</p>
-          </div>
+          <EmptyState icon="badge" title="No achievements yet" message="Start taking quizzes to earn your first badge!" />
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             {user.badges.map((b, i) => (
-              <div key={i} style={{ textAlign: 'center', padding: '16px 20px', background: 'var(--gray-50)', borderRadius: 12, border: '2px solid var(--gray-200)', minWidth: 90 }}>
-                <div style={{ fontSize: '2rem', marginBottom: 6 }}>{b.icon || BADGE_ICONS[b.name] || '🏅'}</div>
+              <div key={i} style={{ textAlign: 'center', padding: '16px 20px', background: 'var(--gray-50)', borderRadius: 12, border: '2px solid var(--gray-200)', minWidth: 100 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--white)', border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', color: 'var(--accent-dark)' }}>
+                  <Icon name="badge" size={24} color="var(--accent-dark)" />
+                </div>
                 <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--gray-800)' }}>{b.name}</div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--gray-400)', marginTop: 2 }}>
                   {b.awardedAt ? new Date(b.awardedAt).toLocaleDateString('en-IN') : ''}

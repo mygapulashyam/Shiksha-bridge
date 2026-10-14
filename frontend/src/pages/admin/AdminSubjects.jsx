@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Modal, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 export default function AdminSubjects() {
@@ -57,7 +58,10 @@ export default function AdminSubjects() {
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">Subjects & Concepts</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="subjects" size={26} color="var(--primary)" />
+          <span>Subjects &amp; Concepts</span>
+        </h1>
         <p className="page-subtitle">Configure the curriculum — subjects, chapters, and learning concepts for Classes 6–10</p>
       </div>
 
@@ -68,10 +72,10 @@ export default function AdminSubjects() {
         {/* Subjects Panel */}
         <div className="card">
           <SectionHeader title="Subjects" subtitle={`${subjects.length} subjects`}
-            action={<button className="btn btn-primary btn-sm" onClick={() => { setSubjectForm({ name: '', code: '', grade: 6, language: 'en', icon: '📚', color: '#4F46E5' }); setEditingSubjectId(null); setSubjectModal(true); }}>+ Add</button>} />
+            action={<button className="btn btn-primary btn-sm" onClick={() => { setSubjectForm({ name: '', code: '', grade: 6, language: 'en', icon: 'book', color: '#4F46E5' }); setEditingSubjectId(null); setSubjectModal(true); }}>+ Add</button>} />
 
           {subjects.length === 0 ? (
-            <EmptyState icon="📚" title="No subjects yet" message="Add a subject to start building the curriculum." />
+            <EmptyState icon="book" title="No subjects yet" message="Add a subject to start building the curriculum." />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {subjects.map(s => (
@@ -84,7 +88,9 @@ export default function AdminSubjects() {
                     border: `2px solid ${activeSubject?._id === s._id ? 'var(--primary)' : 'transparent'}`,
                     transition: 'all 0.15s'
                   }}>
-                  <span style={{ fontSize: '1.5rem' }}>{s.icon}</span>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--white)', border: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon name="book" size={18} color="var(--primary)" />
+                  </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
@@ -96,7 +102,7 @@ export default function AdminSubjects() {
                     <div style={{ width: 12, height: 12, borderRadius: '50%', background: s.color }} />
                     <div>
                       <button className="btn btn-ghost btn-xs" onClick={(ev) => { ev.stopPropagation(); setSubjectForm({
-                        name: s.name || '', code: s.code || '', grade: s.grade || 6, language: s.language || 'en', icon: s.icon || '📚', color: s.color || '#4F46E5'
+                        name: s.name || '', code: s.code || '', grade: s.grade || 6, language: s.language || 'en', icon: s.icon || 'book', color: s.color || '#4F46E5'
                       }); setEditingSubjectId(s._id); setSubjectModal(true); }}>Edit</button>
                     </div>
                   </div>
@@ -115,9 +121,9 @@ export default function AdminSubjects() {
           />
 
           {!activeSubject ? (
-            <EmptyState icon="👈" title="Select a subject" message="Click on a subject on the left to see its concepts." />
+            <EmptyState icon="book" title="Select a subject" message="Click on a subject on the left to see its concepts." />
           ) : concepts.length === 0 ? (
-            <EmptyState icon="🧩" title="No concepts yet" message="Add the first concept for this subject."
+            <EmptyState icon="bulb" title="No concepts yet" message="Add the first concept for this subject."
               action={<button className="btn btn-primary btn-sm" onClick={() => setConceptModal(true)}>+ Add Concept</button>} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

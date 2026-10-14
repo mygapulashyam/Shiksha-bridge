@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Layout from '../../components/common/Layout';
 import { PageLoader, Alert, EmptyState } from '../../components/common/UI';
 import LearningPathCard from '../../components/features/LearningPathCard';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 export default function StudentPaths() {
@@ -29,7 +30,10 @@ export default function StudentPaths() {
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">🗺️ My Learning Paths</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="map" size={26} color="var(--primary)" />
+          <span>My Learning Paths</span>
+        </h1>
         <p className="page-subtitle">Step-by-step guides to master each concept you're working on</p>
       </div>
 
@@ -55,17 +59,22 @@ export default function StudentPaths() {
 
       {/* How it works */}
       <div style={{ background: 'linear-gradient(135deg, #1C1914, #2D2720)', borderRadius: 16, padding: '20px 24px', marginBottom: 24, color: 'white' }}>
-        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent)', marginBottom: 12 }}>📖 How Learning Paths Work</div>
+        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon name="book" size={18} color="var(--accent)" />
+          <span>How Learning Paths Work</span>
+        </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {[
-            ['📖','Step 1: Revise','Read the concept notes'],
-            ['🎬','Step 2: Watch','Short explanation video'],
-            ['🔧','Step 3: Drill','Remedial practice quiz'],
-            ['📊','Step 4: Re-test','Retry the diagnostic'],
-            ['🚀','Step 5: Advance','Unlock next concept'],
-          ].map(([icon, title, desc]) => (
-            <div key={title} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 160px', minWidth: 160 }}>
-              <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{icon}</span>
+            ['book','Step 1: Revise','Read the concept notes'],
+            ['video','Step 2: Watch','Short explanation video'],
+            ['wrench','Step 3: Drill','Remedial practice quiz'],
+            ['chart','Step 4: Re-test','Retry the diagnostic'],
+            ['rocket','Step 5: Advance','Unlock next concept'],
+          ].map(([iconName, title, desc]) => (
+            <div key={title} style={{ display: 'flex', gap: 10, alignItems: 'center', flex: '1 1 160px', minWidth: 160 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name={iconName} size={18} color="var(--accent)" />
+              </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.78rem', color: 'white' }}>{title}</div>
                 <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>{desc}</div>
@@ -76,14 +85,22 @@ export default function StudentPaths() {
       </div>
 
       {activePaths.length === 0 && completedPaths.length === 0 ? (
-        <EmptyState icon="🗺️" title="No learning paths yet"
-          message="Take a quiz to get personalized learning paths for your weak concepts."
-          action={<a href="/student/quizzes" className="btn btn-primary">Browse Quizzes →</a>} />
+        <EmptyState icon="map" title="No personalized learning paths yet"
+          message="Learning paths are generated when you complete quizzes. In the meantime, explore notes and videos uploaded by teachers in the Study Library!"
+          action={
+            <div className="flex gap-2">
+              <a href="/student/resources" className="btn btn-primary">Open Study Library →</a>
+              <a href="/student/quizzes" className="btn btn-outline">Browse Quizzes</a>
+            </div>
+          } />
       ) : (
         <>
           {activePaths.length > 0 && (
             <div style={{ marginBottom: 32 }}>
-              <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 12 }}>🔥 Active Paths ({activePaths.length})</div>
+              <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="flame" size={18} color="#FF6B35" />
+                <span>Active Paths ({activePaths.length})</span>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {activePaths.map(p => <LearningPathCard key={p._id} path={p} onAdvance={handleAdvance} />)}
               </div>
@@ -92,7 +109,10 @@ export default function StudentPaths() {
 
           {completedPaths.length > 0 && (
             <div>
-              <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 12, color: 'var(--secondary)' }}>✅ Completed Paths ({completedPaths.length})</div>
+              <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 12, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="success" size={18} color="var(--secondary)" />
+                <span>Completed Paths ({completedPaths.length})</span>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {completedPaths.map(p => <LearningPathCard key={p._id} path={p} onAdvance={handleAdvance} />)}
               </div>

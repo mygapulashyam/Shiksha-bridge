@@ -24,9 +24,13 @@ export default function StudentAttempt() {
   const [startedAt] = useState(Date.now());
   const timerRef = useRef(null);
   const submittingRef = useRef(false);
+  const initializedRef = useRef(false);
 
   // Load quiz + start attempt
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     const init = async () => {
       try {
         const [qRes, aRes] = await Promise.all([
@@ -50,9 +54,15 @@ export default function StudentAttempt() {
           setAnswers(mappedAnswers);
         }
 
-        const durationSec = qRes.data.data.duration * 60;
-        const timeTaken = aRes.data.data.timeTaken || 0;
-        const remaining = Math.max(0, durationSec - timeTaken);
+        // Compute timer from server-calculated remainingSeconds and deadline
+        let remaining = aRes.data.data.remainingSeconds;
+        if (remaining === undefined && aRes.data.data.deadline) {
+          const deadlineMs = new Date(aRes.data.data.deadline).getTime();
+          remaining = Math.max(0, Math.round((deadlineMs - Date.now()) / 1000));
+        }
+        if (remaining === undefined) {
+          remaining = (qRes.data.data.duration || 20) * 60;
+        }
         setTimeLeft(remaining);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to start quiz');
@@ -164,13 +174,18 @@ export default function StudentAttempt() {
             <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{answered}</span>/{totalQ} answered
           </div>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 800, minWidth: 80,
-            textAlign: 'center', padding: '6px 16px', borderRadius: 8,
+            fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, minWidth: 90,
+            textAlign: 'center', padding: '6px 14px', borderRadius: 8,
             background: timerDanger ? '#FFEBEB' : 'var(--gray-100)',
             color: timerDanger ? 'var(--danger)' : 'var(--gray-700)',
             animation: timerDanger ? 'pulse 1s ease infinite' : 'none',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
           }}>
-            ⏱ {timeLeft !== null ? formatTime(timeLeft) : '--:--'}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>{timeLeft !== null ? formatTime(timeLeft) : '--:--'}</span>
           </div>
         </div>
       </div>

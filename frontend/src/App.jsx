@@ -16,6 +16,7 @@ import AdminSubjects    from './pages/admin/AdminSubjects';
 import AdminImport      from './pages/admin/AdminImport';
 import AdminRankings    from './pages/admin/AdminRankings';
 import AdminClasses     from './pages/admin/AdminClasses';
+import AdminResources   from './pages/admin/AdminResources';
 
 // Teacher
 import TeacherDashboard    from './pages/teacher/TeacherDashboard';
@@ -37,6 +38,7 @@ import StudentProgress  from './pages/student/StudentProgress';
 import StudentPaths     from './pages/student/StudentPaths';
 import StudentDoubts    from './pages/student/StudentDoubts';
 import StudentReport    from './pages/student/StudentReport';
+import StudentResources from './pages/student/StudentResources';
 
 import NotFound from './pages/NotFound';
 
@@ -72,6 +74,7 @@ export default function App() {
             <Route path="/admin/subjects"  element={<ProtectedRoute roles={['admin']}><AdminSubjects /></ProtectedRoute>} />
             <Route path="/admin/import"    element={<ProtectedRoute roles={['admin']}><AdminImport /></ProtectedRoute>} />
             <Route path="/admin/rankings"  element={<ProtectedRoute roles={['admin']}><AdminRankings /></ProtectedRoute>} />
+            <Route path="/admin/resources" element={<ProtectedRoute roles={['admin']}><AdminResources /></ProtectedRoute>} />
 
             {/* ── Teacher ───────────────────────────────────── */}
             <Route path="/teacher"                     element={<ProtectedRoute roles={['teacher']}><TeacherDashboard /></ProtectedRoute>} />
@@ -92,6 +95,7 @@ export default function App() {
             <Route path="/student/attempts/:id/result"  element={<ProtectedRoute roles={['student']}><StudentResult /></ProtectedRoute>} />
             <Route path="/student/progress"             element={<ProtectedRoute roles={['student']}><StudentProgress /></ProtectedRoute>} />
             <Route path="/student/paths"                element={<ProtectedRoute roles={['student']}><StudentPaths /></ProtectedRoute>} />
+            <Route path="/student/resources"            element={<ProtectedRoute roles={['student']}><StudentResources /></ProtectedRoute>} />
             <Route path="/student/doubts"               element={<ProtectedRoute roles={['student']}><StudentDoubts /></ProtectedRoute>} />
             <Route path="/student/report"               element={<ProtectedRoute roles={['student']}><StudentReport /></ProtectedRoute>} />
 

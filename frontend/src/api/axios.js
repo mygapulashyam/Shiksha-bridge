@@ -33,7 +33,17 @@ api.interceptors.response.use(
   async (err) => {
     const originalRequest = err.config;
 
-    if (err.response?.status === 401 && !originalRequest._retry) {
+    // Do NOT attempt refresh on /auth/* endpoints (e.g. login, verify-otp, forgot-password)
+    const isAuthRoute = originalRequest?.url && (
+      originalRequest.url.includes('/auth/login') ||
+      originalRequest.url.includes('/auth/register') ||
+      originalRequest.url.includes('/auth/refresh-token') ||
+      originalRequest.url.includes('/auth/verify-otp') ||
+      originalRequest.url.includes('/auth/reset-password') ||
+      originalRequest.url.includes('/auth/forgot-password')
+    );
+
+    if (err.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -57,7 +67,7 @@ api.interceptors.response.use(
             refreshToken,
           });
 
-          if (response.data.success) {
+          if (response.data?.success) {
             const { token, refreshToken: newRefreshToken } = response.data;
             localStorage.setItem('sb_token', token);
             if (newRefreshToken) {
@@ -67,6 +77,8 @@ api.interceptors.response.use(
             processQueue(null, token);
             isRefreshing = false;
             return api(originalRequest);
+          } else {
+            throw new Error('Refresh failed');
           }
         } catch (refreshError) {
           processQueue(refreshError, null);

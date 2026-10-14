@@ -111,10 +111,14 @@ export default function AlertBell() {
     <div style={{ position: 'relative' }} ref={dropdownRef}>
       {/* Bell Button */}
       <button onClick={handleOpen}
-        style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: 8, transition: 'background 0.15s' }}
+        aria-label="Alerts"
+        style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: 8, transition: 'background 0.15s', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gray-700)' }}
         onMouseEnter={e => e.currentTarget.style.background = 'var(--gray-100)'}
         onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-        <span style={{ fontSize: '1.3rem' }}>🔔</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
         {unreadCount > 0 && (
           <span style={{
             position: 'absolute', top: 2, right: 2,
@@ -141,8 +145,13 @@ export default function AlertBell() {
         }}>
           {/* Header */}
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-              🔔 Alerts {unreadCount > 0 && <span style={{ fontSize: '0.75rem', background: 'var(--danger)', color: 'white', borderRadius: 10, padding: '1px 7px', marginLeft: 4 }}>{unreadCount}</span>}
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+              <span>Alerts</span>
+              {unreadCount > 0 && <span style={{ fontSize: '0.75rem', background: 'var(--danger)', color: 'white', borderRadius: 10, padding: '1px 7px', marginLeft: 4 }}>{unreadCount}</span>}
             </div>
             <div className="flex gap-2">
               {unreadCount > 0 && (

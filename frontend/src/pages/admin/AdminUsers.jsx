@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/common/Layout';
 import { Alert, EmptyState, Modal, Pagination, SearchInput, SectionHeader } from '../../components/common/UI';
+import Icon from '../../components/common/Icon';
 import api from '../../api/axios';
 
 const BLANK_USER = {
@@ -316,7 +317,10 @@ export default function AdminUsers() {
   return (
     <Layout>
       <div className="page-header">
-        <h1 className="page-title">Users</h1>
+        <h1 className="page-title flex items-center gap-2">
+          <Icon name="users" size={26} color="var(--primary)" />
+          <span>Users</span>
+        </h1>
         <p className="page-subtitle">Manage teachers and students across all schools</p>
       </div>
 
@@ -333,7 +337,10 @@ export default function AdminUsers() {
               <option value="teacher">Teacher</option>
               <option value="student">Student</option>
             </select>
-            <button className="btn btn-ghost btn-sm" onClick={() => fetchUsers(page)}>🔍 Search</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => fetchUsers(page)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="search" size={13} color="currentColor" />
+              <span>Search</span>
+            </button>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => setModal(true)}>+ Add User</button>
         </div>
@@ -341,7 +348,7 @@ export default function AdminUsers() {
         {loading ? (
           <div className="page-loader" style={{ minHeight: 200 }}><div className="spinner" /></div>
         ) : users.length === 0 ? (
-          <EmptyState icon="👥" title="No users found" message="Create users or adjust your filters." />
+          <EmptyState icon="users" title="No users found" message="Create users or adjust your filters." />
         ) : (
           <div className="table-wrapper">
             <table className="table">
@@ -377,21 +384,28 @@ export default function AdminUsers() {
                         {u.role === 'teacher' ? `Subjects: ${u.subjects?.length || 0} · Classes: ${u.classes?.length || 0}` : '—'}
                       </div>
                       <div style={{ color: 'var(--gray-500)' }}>
-                        {u.streak > 0 ? `🔥 Streak: ${u.streak}` : ''}
+                        {u.streak > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Icon name="flame" size={12} color="#FF6B35" />
+                            Streak: {u.streak}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td><span className={`badge ${u.isActive ? 'badge-success' : 'badge-gray'}`}>{u.isActive ? 'Active' : 'Inactive'}</span></td>
                     <td>
                       <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                         <button className="btn btn-outline btn-sm"
-                          style={{ fontSize: '0.75rem' }}
+                          style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           onClick={() => openEditModal(u)}>
-                          ✏️ Edit
+                          <Icon name="edit" size={12} color="currentColor" />
+                          <span>Edit</span>
                         </button>
                         <button className={`btn btn-sm ${u.isActive ? 'btn-ghost' : 'btn-secondary'}`}
-                          style={{ fontSize: '0.75rem' }}
+                          style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           onClick={() => toggleStatus(u._id, u.isActive)}>
-                          {u.isActive ? '🔒 Deactivate' : '✅ Activate'}
+                          <Icon name={u.isActive ? 'lock' : 'success'} size={12} color="currentColor" />
+                          <span>{u.isActive ? 'Deactivate' : 'Activate'}</span>
                         </button>
                       </div>
                     </td>
