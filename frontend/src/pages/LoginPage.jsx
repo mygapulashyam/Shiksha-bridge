@@ -178,7 +178,20 @@ export default function LoginPage() {
       {/* Left – Branding */}
       <div className="login-left">
         <div style={{ maxWidth: 480 }}>
-          <div className="login-logo">🎓 ShikshaBridge</div>
+          <div className="login-logo" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <img
+              src="/logo.png"
+              alt="ShikshaBridge Logo"
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                boxShadow: '0 4px 18px rgba(0, 0, 0, 0.45)',
+                objectFit: 'cover'
+              }}
+            />
+            <span>ShikshaBridge</span>
+          </div>
           <div className="login-tagline">
             {t('tagline')}
           </div>

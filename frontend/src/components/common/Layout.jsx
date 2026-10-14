@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage, languagesList } from '../../context/LanguageContext';
 import AlertBell from '../features/AlertBell';
@@ -281,18 +281,29 @@ export default function Layout({ children }) {
       >
         {/* Logo */}
         <div className="sidebar-logo">
-          <div className="sidebar-logo-text">
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.1)', color: '#fff' }}>
-              <NavIcon name="academic" size={18} />
-            </span>
-            ShikshaBridge
-          </div>
-          <div className="sidebar-logo-sub">Learning for Every Child</div>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
+            <img
+              src="/logo.png"
+              alt="ShikshaBridge"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
+                objectFit: 'cover',
+                flexShrink: 0
+              }}
+            />
+            <div>
+              <div className="sidebar-logo-text">ShikshaBridge</div>
+              <div className="sidebar-logo-sub">Learning For Every Child</div>
+            </div>
+          </Link>
         </div>
 
         {/* Nav Items */}
         <div className="sidebar-nav" role="list">
-          <div className="nav-section-label">Navigation</div>
+          <div className="nav-section-label">Main Menu</div>
           {navItems.map(item => (
             <NavLink
               key={item.to}
@@ -304,35 +315,26 @@ export default function Layout({ children }) {
               <span className="nav-item-icon" aria-hidden="true">
                 <NavIcon name={item.icon} size={18} />
               </span>
-              <span>{item.label}</span>
+              <span className="nav-item-label">{item.label}</span>
             </NavLink>
           ))}
         </div>
 
         {/* Language Switcher */}
         <div className="sidebar-lang">
-          <div style={{
-            fontSize: '0.6rem',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '1.8px',
-            color: 'rgba(255,255,255,0.3)',
-            marginBottom: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <div className="sidebar-lang-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <line x1="2" y1="12" x2="22" y2="12" />
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
             </svg>
-            Language
+            <span>Interface Language</span>
           </div>
           <select
             value={currentLanguage}
             onChange={e => changeLanguage(e.target.value)}
             aria-label="Select language"
+            className="sidebar-lang-select"
           >
             {languagesList.map(lang => (
               <option key={lang.code} value={lang.code}>{lang.label}</option>
@@ -344,59 +346,49 @@ export default function Layout({ children }) {
         <div className="sidebar-user">
           <div
             className="avatar"
-            style={{ background: ROLE_GRADIENTS[user?.role] }}
+            style={{
+              background: ROLE_GRADIENTS[user?.role],
+              width: 38,
+              height: 38,
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              flexShrink: 0
+            }}
             aria-hidden="true"
           >
             {initials}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              color: 'rgba(255,255,255,0.92)',
+              color: '#FFFFFF',
               fontWeight: 700,
-              fontSize: '0.82rem',
+              fontSize: '0.84rem',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              letterSpacing: '-0.01em'
             }}>
               {user?.name}
             </div>
             <div style={{
-              color: 'rgba(255,255,255,0.38)',
-              fontSize: '0.68rem',
-              fontWeight: 500,
+              color: 'rgba(255,255,255,0.48)',
+              fontSize: '0.7rem',
+              fontWeight: 600,
               marginTop: '1px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}>
-              {ROLE_LABELS[user?.role]}
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: ROLE_COLORS[user?.role] || '#10B981' }} />
+              <span>{ROLE_LABELS[user?.role]}</span>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            title="Logout"
+            title="Log out of session"
             aria-label="Logout"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 32,
-              height: 32,
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '50%',
-              color: 'rgba(255,255,255,0.7)',
-              cursor: 'pointer',
-              flexShrink: 0,
-              transition: 'all 200ms ease',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(214,59,59,0.25)';
-              e.currentTarget.style.borderColor = 'rgba(214,59,59,0.5)';
-              e.currentTarget.style.color = '#ff8080';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
-              e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
-            }}
+            className="sidebar-logout-btn"
           >
             <NavIcon name="logout" size={15} />
           </button>
@@ -429,26 +421,13 @@ export default function Layout({ children }) {
                 transition: 'all 200ms ease',
               }} />
             </button>
-            <div>
-              <div style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 800,
-                fontSize: '1rem',
-                color: 'var(--gray-900)',
-                letterSpacing: '-0.02em',
-                lineHeight: 1,
-              }}>
-                ShikshaBridge
+            <div className="topbar-context">
+              <div className="topbar-portal-badge">
+                <span className="topbar-portal-dot" style={{ background: ROLE_COLORS[user?.role] || 'var(--primary)' }} />
+                <span>{ROLE_LABELS[user?.role]} Space</span>
               </div>
-              <div style={{
-                fontSize: '0.67rem',
-                color: 'var(--gray-500)',
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                marginTop: '2px',
-              }}>
-                {ROLE_LABELS[user?.role]} Portal
+              <div className="topbar-title">
+                {user?.school?.name ? user.school.name : 'ShikshaBridge Learning Network'}
               </div>
             </div>
           </div>
@@ -457,56 +436,44 @@ export default function Layout({ children }) {
           <div className="flex items-center gap-3">
             {/* Student XP/Streak bar */}
             {user?.role === 'student' && (
-              <>
-                <div className="streak-badge" aria-label={`${user?.streak || 0} day streak`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <NavIcon name="flame" size={14} style={{ color: 'var(--brand-coral, #E8650A)' }} />
-                  <span>{user?.streak || 0}</span>
+              <div className="topbar-gamification">
+                <div className="topbar-pill" title="Daily study streak">
+                  <NavIcon name="flame" size={15} color="var(--primary)" />
+                  <span className="font-bold">{user?.streak || 0}</span>
+                  <span className="topbar-pill-sub">day streak</span>
                 </div>
-                <div className="hidden-mobile" style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--gray-600)',
-                  fontWeight: 700,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  lineHeight: 1.2,
-                }}>
-                  <span>Lv. {user?.level || 1}</span>
-                  <span style={{ color: 'var(--gray-400)', fontSize: '0.68rem' }}>{user?.xp || 0} XP</span>
+                <div className="topbar-pill" title="Current level & earned XP">
+                  <NavIcon name="star" size={14} color="var(--accent-dark)" />
+                  <span className="font-bold">Lv. {user?.level || 1}</span>
+                  <span className="topbar-pill-sub">({user?.xp || 0} XP)</span>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Alert Bell for teacher/admin */}
             {(user?.role === 'teacher' || user?.role === 'admin') && <AlertBell />}
 
-            {/* User avatar */}
+            {/* Topbar User Profile Card */}
             <div
-              className="flex items-center gap-2"
-              style={{ cursor: 'default' }}
+              className="topbar-user-card"
               title={user?.name}
             >
               <div
                 className="avatar avatar-sm"
-                style={{ background: ROLE_GRADIENTS[user?.role] }}
+                style={{
+                  background: ROLE_GRADIENTS[user?.role],
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
+                }}
                 aria-hidden="true"
               >
                 {initials}
               </div>
               <div className="hidden-mobile" style={{ lineHeight: 1.25 }}>
-                <div style={{
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  color: 'var(--gray-800)',
-                }}>
+                <div className="topbar-user-name">
                   {user?.name}
                 </div>
-                <div style={{
-                  fontSize: '0.65rem',
-                  color: 'var(--gray-400)',
-                  fontWeight: 500,
-                }}>
-                  {user?.email}
+                <div className="topbar-user-role">
+                  {ROLE_LABELS[user?.role]}
                 </div>
               </div>
             </div>
