@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage, languagesList } from '../../context/LanguageContext';
 import AlertBell from '../features/AlertBell';
+import logoImg from '../../assets/logo.png';
 
 // Minimal SVG Icon Components
 const NavIcon = ({ name, size = 18 }) => {
@@ -283,7 +284,7 @@ export default function Layout({ children }) {
         <div className="sidebar-logo">
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
             <img
-              src="/logo.png"
+              src={logoImg}
               alt="ShikshaBridge"
               style={{
                 width: 40,

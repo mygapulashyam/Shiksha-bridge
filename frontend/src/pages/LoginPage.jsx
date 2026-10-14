@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage, languagesList } from '../context/LanguageContext';
 import api from '../api/axios';
+import logoImg from '../assets/logo.png';
 
 export default function LoginPage() {
   const { login, user } = useAuth();
@@ -180,7 +181,7 @@ export default function LoginPage() {
         <div style={{ maxWidth: 480 }}>
           <div className="login-logo" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <img
-              src="/logo.png"
+              src={logoImg}
               alt="ShikshaBridge Logo"
               style={{
                 width: 48,
